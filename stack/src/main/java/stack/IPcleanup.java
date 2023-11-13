@@ -1,9 +1,9 @@
 package stack;
 
 import static io.restassured.RestAssured.given;
-import stack.AUTOPILOT;
 import utilities.ExcelUtility;
 import stack.ServiceCleanupUtility;
+import stack.AUTOPILOT;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -955,8 +955,11 @@ public static ArrayList<String> getParentServices(String serviceID) {
 			for (String parent : parentServiceName) {
 				if(parent.contains("_")) {
 					serviceFromEndpoint= parent.split("_");
-					parentServiceName.add(serviceFromEndpoint[0]);
-					break;
+					if(!parentServiceName.contains(serviceFromEndpoint)) {
+						parentServiceName.add(serviceFromEndpoint[0]);
+						break;
+					}					
+					
 				}
 			}
 		}
@@ -967,8 +970,10 @@ public static ArrayList<String> getParentServices(String serviceID) {
 			for (String parent : parentServiceName) {
 				if(parent.contains("_")) {
 					serviceFromEndpoint= parent.split("_");
-					parentServiceName.add(serviceFromEndpoint[0]);
-					break;
+					if(!parentServiceName.contains(serviceFromEndpoint[0])) {
+						parentServiceName.add(serviceFromEndpoint[0]);
+						break;
+					}
 				}
 			}
 			System.out.println(
@@ -1015,6 +1020,7 @@ public static ArrayList<String> getParentServices(String serviceID) {
 		exVar_DeactivateJobId = "NULL";
 		exVar_Environment = "NULL";
 		exVar_AsriStatus = "CLEANED";
+		exData.put("colIP_Status", "NULL");
 	}
 
 }
