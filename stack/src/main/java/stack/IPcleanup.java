@@ -10,8 +10,10 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -24,19 +26,31 @@ import org.json.JSONObject;
 import org.json.XML;
 
 import com.jayway.jsonpath.JsonPath;
+
+import io.restassured.RestAssured;
 import io.restassured.response.Response;
 
 public class IPcleanup {
 
-	public static String Test4_authUrl = "http://act-env4.idc1.level3.com:8081/ac-ip-rs-web/rs/auth";
-	public static String Test4_fetch = "http://act-env4.idc1.level3.com:8081/ac-ip-rs-web/rs/view/default/data?q0=";
-	public static String Test4_fetchDetailsFromReqId = "http://act-env4.idc1.level3.com:8081/ac-ip-rs-web/rs/requestPayload?requestID=";
+	// constructor
+	public IPcleanup() {
+
+	}
 
 	public static String Test1_authUrl = "http://act-env1.idc1.level3.com:8081/ac-ip-rs-web/rs/auth";
 	public static String Test1_fetch = "http://act-env1.idc1.level3.com:8081/ac-ip-rs-web/rs/view/default/data?q0=";
 	public static String Test1_fetchDetailsFromReqId = "http://act-env1.idc1.level3.com:8081/ac-ip-rs-web/rs/requestPayload?requestID=";
 
+	public static String Test2_authUrl = "http://act-env2.idc1.level3.com:8081/ac-ip-rs-web/rs/auth";
+	public static String Test2_fetch = "http://act-env2.idc1.level3.com:8081/ac-ip-rs-web/rs/view/default/data?q0=";
+	public static String Test2_fetchDetailsFromReqId = "http://act-env2.idc1.level3.com:8081/ac-ip-rs-web/rs/requestPayload?requestID=";
+
+	public static String Test4_authUrl = "http://act-env4.idc1.level3.com:8081/ac-ip-rs-web/rs/auth";
+	public static String Test4_fetch = "http://act-env4.idc1.level3.com:8081/ac-ip-rs-web/rs/view/default/data?q0=";
+	public static String Test4_fetchDetailsFromReqId = "http://act-env4.idc1.level3.com:8081/ac-ip-rs-web/rs/requestPayload?requestID=";
+
 	public static String Test1_SASI = "https://sasi-test1.kubeodc-test.corp.intranet/inventory/v1/asri/service_type?name=";
+	public static String Test2_SASI = "https://sasi-test2.kubeodc-test.corp.intranet/inventory/v1/asri/service_type?name=";
 	public static String Test4_SASI = "https://sasi-test4.kubeodc-test.corp.intranet/inventory/v1/asri/service_type?name=";
 
 	public static String Test_GET_IP = "https://sasi-sasiwrap-test1.kubeodc.corp.intranet/wrappers/nisws/ipBlocks?circuitId=";
@@ -45,7 +59,13 @@ public class IPcleanup {
 	public static String username;
 	public static String password;
 
+	public static String inventoryType;
+	public static String explicitEnvironment;
+	
+	public static String cleanIpUsingOrderId;
+
 	public static String environment;
+	public static String parentServiceEnvironment;
 	static AUTOPILOT ap = new AUTOPILOT();
 	static ExcelUtility eu = new ExcelUtility();
 
@@ -75,27 +95,25 @@ public class IPcleanup {
 
 	public static void main(String[] args) throws InterruptedException {
 
-//	    try {
-//			myconsole = new PrintStream(new File(fileDir+"\\IP_DATA\\CLEANED_IP_FILES\\CleanedIpSheet_"+dateTime+".txt"));
-//			System.setOut(myconsole);
-//
-//		    
-//		} catch (FileNotFoundException e) {
-//			System.out.println(e);
-//		}
-
+		// main line down
 		eu.readExcelData();
-//		Asri.getParentServices("CO/KXFN/035470/LUMN");
-		
+		// read circuitIds from csv
+//		eu.getCircuitIDs();
+
+		//
+//		IPcleanup.deleteServicefromInventory("CO/KXFN/046963/LUMN","services");
+//		deleteServicefromArm("29/KXGS/667107//MS","services");
+
 	}
 
-	public static void deactivateService(String serviceID) {
+	public static boolean deactivateService(String serviceID) {
 
 		ArrayList<String> actDeactivate;
 		ArrayList<String> act;
 		String serviceAlias = serviceID;
 		exVar_ServiceAlias = serviceAlias;
 		exData.put("colService", exVar_ServiceAlias);
+		boolean isCleaned = false;
 		// checking for successful delete request
 		System.out.println("\n=======================ACT CLEANUP START============================");
 		System.out.println("------------checking for successful \"delete\" request------------------");
@@ -106,133 +124,34 @@ public class IPcleanup {
 			actDeactivate = getJSONresponseFromServiceAlias(serviceAlias, "deactivate");
 			if (actDeactivate.size() > 0 && actDeactivate.get(0) != null) {
 				System.out.println("Service already deactivated!!\nActID::" + actDeactivate.get(0));
-				exVar_ActStatus = "CLEANED";
+				exVar_ActStatus = "ALREADY CLEANED";
+				isCleaned = true;
 				exVar_ActId = actDeactivate.get(0);
 				exData.put("colActStatus", exVar_ActStatus);
-				exData.put("colActId", "Deactivate::" + exVar_ActId);
+				exData.put("colActId", "Already Deactivate::" + exVar_ActId);
 				exData.put("colError", "NULL");
 				exData.put("colDeactivateJobId", "NULL");
 			} else {
-				{
-					System.out.println(
-							"\n-----------No successful \"delete\" or \"deactivate\" request found!!!---------");
-					exData.put("colActStatus", "NOT FOUND");
-					System.out.println("\n-----------Checking for successful \"new\" request---------------");
-					act = getJSONresponseFromServiceAlias(serviceAlias, "new");
-					if (act.size() > 0) {
-						String token = ap.getToken(username, password);
-//						System.out.println("Logging into Autopilot\nToken generated::"+token+"\nLogged in Successfully");
-						System.out.println("Logging into Autopilot\nLogged in Successfully");
-						String jobid_ = ap.triggerWorkflow(act.get(0), act.get(1), "LNAAS_DELETE_TRANSACTION_ACT_TL_V1",
-								token);
-						System.out.println(
-								"Triggering workflow::\"LNAAS_DELETE_TRANSACTION_ACT_TL_V1\"\n Job id::" + jobid_);
-						exVar_DeactivateJobId = jobid_;
-						exData.put("colDeactivateJobId", exVar_DeactivateJobId);
-						try {
-							System.out.println("Is Workflow completed?::" + ap.getWorkflowStatus(jobid_, token));
-						} catch (InterruptedException e) {
-							e.printStackTrace();
-						}
-						try {
-							String errorString = ap.getTaskDetail(jobid_, "e5b9", "$..outgoing.return_value", token);
-							if (errorString != null) {
-								System.out.println("Delete Transaction from ACT completed Successfully");
-								String successDelActId = ap.getTaskDetail(jobid_, "14bc", "$..actIdentifierId", token);
-								exData.put("colActStatus", "CLEANED");
-								exData.put("colRequestId", "NULL");
-								exData.put("colActId", "Delete::" + successDelActId);
-							} else {
-								errorString = ap.getTaskDetail(jobid_, "51ed", "$..outgoing..message", token);
-								String delActId = ap.getTaskDetail(jobid_, "51ed", "$..outgoing..actID", token);
-								System.out.println("DELETE Transaction failed with error::");
-								System.out.println("............................................................");
-								System.out.println(errorString);
-								System.out.println("............................................................");
-								exVar_Error = errorString;
-								exData.put("colError", exVar_Error);
+				System.out.println("No successful \"delete\" or \"deactivate\" request found!!!");
+				isCleaned = deleteInternetServiceFromACT(serviceID);
 
-								exVar_ActStatus = "NOT CLEANED";
-								exVar_ActId = delActId;
-								exData.put("colActStatus", exVar_ActStatus);
-								exData.put("colActId", "Delete::" + exVar_ActId);
-								exData.put("colRequestId", "NULL");
-
-								// Triggering DEACTIVATE workflow as we got error using DELETE workflow
-								if (errorString != null || AUTOPILOT.iterationCount>=20) {
-									System.out.println(
-											"\n===Triggering DEACTIVATE workflow as we got error using DELETE workflow===\n");
-									jobid_ = ap.triggerWorkflow(act.get(0), act.get(1), "Deactivate_Transaction_ACT",
-											token);
-									System.out.println(
-											"Triggering workflow::\"DEACTIVATE_TRANSACTION_ACT\"\n job id::" + jobid_);
-									exVar_DeactivateJobId = jobid_;
-									exData.put("colDeactivateJobId", "Deactivate::" + exVar_DeactivateJobId);
-									try {
-										System.out.println(
-												"Is Workflow completed?::" + ap.getWorkflowStatus(jobid_, token));
-									} catch (InterruptedException e) {
-										e.printStackTrace();
-									}
-									try {
-										errorString = ap.getTaskDetail(jobid_, "2375", "$..outgoing.return_value",
-												token);
-										if (errorString != null) {
-											System.out.println("Deactivation completed Successfully");
-//											String successDelActId = ap.getTaskDetail(jobid_, "662a","$..actIdentifierId", token);
-											exData.put("colActStatus", "CLEANED");
-											exData.put("colRequestId", "NULL");
-											exData.put("colActId", "NULL");
-											exData.put("colError", "NULL");
-										} else {
-											errorString = ap.getTaskDetail(jobid_, "51ed", "$..outgoing..response",
-													token);
-//											delActId = ap.getTaskDetail(jobid_, "51ed","$..outgoing..actID", token);
-											System.out.println("Deactivation failed with error::");
-											System.out.println(
-													"+-----------+---------+-----------+---------+-----------+---------+-----------+---------+-----------+---------+");
-											System.out.println(errorString);
-											System.out.println(
-													"+-----------+---------+-----------+---------+-----------+---------+-----------+---------+-----------+---------+");
-											exVar_Error = errorString;
-											exData.put("colError", exVar_Error);
-
-											exVar_ActStatus = "NOT CLEANED";
-											exVar_ActId = delActId;
-											exData.put("colActStatus", exVar_ActStatus);
-											exData.put("colActId", "DEACTIVATE::" + "NULL");
-											exData.put("colRequestId", "DEACTIVATE::" + "NULL");
-
-										}
-									} catch (InterruptedException e) {
-										e.printStackTrace();
-									}
-								}
-
-							}
-						} catch (InterruptedException e) {
-							e.printStackTrace();
-						}
-					} else {
-						exData.put("colActStatus", "NOT FOUND");
-					}
-				}
 			}
 		} else {
-			System.out.println("Service already deactivated!!\nActID::" + act.get(0));
-			exVar_ActStatus = "CLEANED";
+			System.out.println("Service already deleted!!\nActID::" + act.get(0));
+			exVar_ActStatus = "ALREADY CLEANED";
+			isCleaned = true;
 			exVar_ActId = act.get(0);
 			exData.put("colActStatus", exVar_ActStatus);
-			exData.put("colActId", "Delete::" + exVar_ActId);
+			exData.put("colActId", "Already Delete::" + exVar_ActId);
 			exData.put("colError", "NULL");
 			exData.put("colDeactivateJobId", "NULL");
 		}
 
-		System.out.println("==============================================ACT CLEANUP END===================================================\n\n");
-
+		System.out.println(
+				"==============================================ACT CLEANUP END===================================================\n\n");
+		return isCleaned;
 	}
-	
-	
+
 	public static void deleteDeactivateServiceFromACT(String serviceID) {
 
 		ArrayList<String> actDeactivate;
@@ -241,8 +160,9 @@ public class IPcleanup {
 		exVar_ServiceAlias = serviceAlias;
 		exData.put("colService", exVar_ServiceAlias);
 		// checking for successful delete request
-		System.out.println("\n==============================================ACT CLEANUP START===================================================");
-		
+		System.out.println(
+				"\n==============================================ACT CLEANUP START===================================================");
+
 		{
 			exData.put("colActStatus", "NOT FOUND");
 			System.out.println("\n-----------Checking for successful \"new\" request---------------");
@@ -250,11 +170,9 @@ public class IPcleanup {
 			if (act.size() > 0) {
 				String token = ap.getToken(username, password);
 //				System.out.println("Logging into Autopilot\nToken generated::"+token+"\nLogged in Successfully");
-				System.out.println("Logging into Autopilot\nLogged in Successfully");
-				String jobid_ = ap.triggerWorkflow(act.get(0), act.get(1), "LNAAS_DELETE_TRANSACTION_ACT_TL_V1",
-						token);
-				System.out.println(
-						"Triggering workflow::\"LNAAS_DELETE_TRANSACTION_ACT_TL_V1\"\nJob id::" + jobid_);
+//				System.out.println("Logging into Autopilot\nLogged in Successfully");
+				String jobid_ = ap.triggerWorkflow(act.get(0), act.get(1), "LNAAS_DELETE_TRANSACTION_ACT_TL_V1", token);
+				System.out.println("Triggering workflow::\"LNAAS_DELETE_TRANSACTION_ACT_TL_V1\"\nJob id::" + jobid_);
 				exVar_DeactivateJobId = jobid_;
 				exData.put("colDeactivateJobId", exVar_DeactivateJobId);
 				try {
@@ -289,24 +207,21 @@ public class IPcleanup {
 						exData.put("colRequestId", "NULL");
 
 						// Triggering DEACTIVATE workflow as we got error using DELETE workflow
-						if (errorString != null || AUTOPILOT.iterationCount>=20) {
+						if (errorString != null || AUTOPILOT.iterationCount >= 20) {
 							System.out.println(
 									"\n===Triggering DEACTIVATE workflow as we got error using DELETE workflow===\n");
-							jobid_ = ap.triggerWorkflow(act.get(0), act.get(1), "Deactivate_Transaction_ACT",
-									token);
-							System.out.println(
-									"Triggering workflow::\"DEACTIVATE_TRANSACTION_ACT\"\nJob id::" + jobid_);
+							jobid_ = ap.triggerWorkflow(act.get(0), act.get(1), "Deactivate_Transaction_ACT", token);
+							System.out
+									.println("Triggering workflow::\"DEACTIVATE_TRANSACTION_ACT\"\nJob id::" + jobid_);
 							exVar_DeactivateJobId = jobid_;
 							exData.put("colDeactivateJobId", "Deactivate::" + exVar_DeactivateJobId);
 							try {
-								System.out.println(
-										"Is Workflow completed?::" + ap.getWorkflowStatus(jobid_, token));
+								System.out.println("Is Workflow completed?::" + ap.getWorkflowStatus(jobid_, token));
 							} catch (InterruptedException e) {
 								e.printStackTrace();
 							}
 							try {
-								errorString = ap.getTaskDetail(jobid_, "2375", "$..outgoing.return_value",
-										token);
+								errorString = ap.getTaskDetail(jobid_, "2375", "$..outgoing.return_value", token);
 								if (errorString != null) {
 									System.out.println("Deactivation completed Successfully");
 //									String successDelActId = ap.getTaskDetail(jobid_, "662a","$..actIdentifierId", token);
@@ -315,15 +230,12 @@ public class IPcleanup {
 									exData.put("colActId", "NULL");
 									exData.put("colError", "NULL");
 								} else {
-									errorString = ap.getTaskDetail(jobid_, "51ed", "$..outgoing..response",
-											token);
+									errorString = ap.getTaskDetail(jobid_, "51ed", "$..outgoing..response", token);
 //									delActId = ap.getTaskDetail(jobid_, "51ed","$..outgoing..actID", token);
 									System.out.println("Deactivation failed with error::");
-									System.out.println(
-											"............................................................");
+									System.out.println("............................................................");
 									System.out.println(errorString);
-									System.out.println(
-											"............................................................");
+									System.out.println("............................................................");
 									exVar_Error = errorString;
 									exData.put("colError", exVar_Error);
 
@@ -348,12 +260,85 @@ public class IPcleanup {
 			}
 		}
 
-		System.out.println("==============================================ACT CLEANUP END===================================================\n\n");
+		System.out.println(
+				"==============================================ACT CLEANUP END===================================================\n\n");
 
 	}
 
+	public static boolean deleteInternetServiceFromACT(String serviceID) {
+
+		ArrayList<String> actDeactivate;
+		ArrayList<String> act;
+		boolean internetServiceCleaned = false;
+		String serviceAlias = serviceID;
+		exVar_ServiceAlias = serviceAlias;
+		exData.put("colService", exVar_ServiceAlias);
+		exData.put("colError", "NULL");
+		// checking for successful delete request
+		System.out.println(
+				"\n==============================================ACT CLEANUP START===================================================");
+
+		{
+			exData.put("colActStatus", "NOT FOUND");
+			System.out.println("\n-----------Checking for successful \"new\" request---------------");
+			act = getJSONresponseFromServiceAlias(serviceAlias, "new");
+			if (act.size() > 0) {
+				String token = ap.getToken(username, password);
+//				System.out.println("Logging into Autopilot\nToken generated::"+token+"\nLogged in Successfully");
+//				System.out.println("Logging into Autopilot\nLogged in Successfully");
+				String jobid_ = ap.triggerWorkflow(act.get(0), act.get(1), "LNAAS_DELETE_TRANSACTION_ACT_TL_V1", token);
+				System.out.println("Triggering workflow::\"LNAAS_DELETE_TRANSACTION_ACT_TL_V1\"\nJob id::" + jobid_);
+				exVar_DeactivateJobId = jobid_;
+				exData.put("colDeactivateJobId", exVar_DeactivateJobId);
+				try {
+					System.out.println("Is Workflow completed?::" + ap.getWorkflowStatus(jobid_, token));
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				try {
+					String errorString = ap.getTaskDetail(jobid_, "e5b9", "$..outgoing.return_value", token);
+					if (errorString != null) {
+						System.out.println("Delete Transaction from ACT completed Successfully");
+						String successDelActId = ap.getTaskDetail(jobid_, "14bc", "$..actIdentifierId", token);
+						exData.put("colActStatus", "CLEANED");
+						exData.put("colRequestId", "NULL");
+						exData.put("colActId", "Delete::" + successDelActId);
+						internetServiceCleaned = true;
+					} else {
+						errorString = ap.getTaskDetail(jobid_, "51ed", "$..outgoing..message", token);
+						String delActId = ap.getTaskDetail(jobid_, "51ed", "$..outgoing..actID", token);
+						System.out.println("DELETE Transaction failed with error::");
+						System.out.println(
+								"+-----------+---------+-----------+---------+-----------+---------+-----------+---------+-----------+---------+");
+						System.out.println(errorString);
+						System.out.println(
+								"+-----------+---------+-----------+---------+-----------+---------+-----------+---------+-----------+---------+");
+						exVar_Error = errorString;
+						exData.put("colError", exVar_Error);
+						exVar_ActStatus = "NOT CLEANED";
+						exVar_ActId = delActId;
+						exData.put("colActStatus", exVar_ActStatus);
+						exData.put("colActId", exVar_ActId);
+						exData.put("colRequestId", "NULL");
+					}
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			} else {
+				exData.put("colActStatus", "NOT FOUND");
+				exData.put("colError", "NULL");
+				internetServiceCleaned = true;
+			}
+		}
+
+		System.out.println(
+				"==============================================ACT CLEANUP END===================================================\n\n");
+		return internetServiceCleaned;
+	}
+
 	public static boolean deleteServicefromAsri(String serviceID, String serviceType) {
-		System.out.println("==============================================ASRI CLEANUP START=================================================");
+		System.out.println(
+				"==============================================ASRI CLEANUP START=================================================");
 		boolean serviceCleanedInAsri = false;
 		boolean isInternetService = false;
 		String resolvedUrl = Test1_SASI.replaceAll("service_type", serviceType);
@@ -377,8 +362,8 @@ public class IPcleanup {
 					exVar_Environment = "TEST1";
 					exData.put("colEnvironment", exVar_Environment);
 				}
-				//updation for endpoint
-				if(serviceID.contains("_")) {
+				// updation for endpoint
+				if (serviceID.contains("_")) {
 					exData.put("colService", serviceID);
 					exData.put("colRequestId", "NULL");
 					exData.put("colActStatus", "NULL");
@@ -391,7 +376,7 @@ public class IPcleanup {
 
 				exVar_AsriStatus = "NOT CLEANED";
 				exData.put("colAsri_Status", exVar_AsriStatus);
-				if(serviceID.contains("_")) {
+				if (serviceID.contains("_")) {
 					exData.put("colService", serviceID);
 					exData.put("colRequestId", "NULL");
 					exData.put("colActStatus", "NULL");
@@ -423,7 +408,7 @@ public class IPcleanup {
 						exVar_Environment = "TEST4";
 						exData.put("colEnvironment", exVar_Environment);
 					}
-					if(serviceID.contains("_")) {
+					if (serviceID.contains("_")) {
 						exData.put("colService", serviceID);
 						exData.put("colRequestId", "NULL");
 						exData.put("colActStatus", "NULL");
@@ -437,7 +422,7 @@ public class IPcleanup {
 				System.out.println("Service not found in Test4 also");
 				exVar_AsriStatus = "NOT FOUND/CLEANED";
 				exData.put("colAsri_Status", exVar_AsriStatus);
-				if(serviceID.contains("_")) {
+				if (serviceID.contains("_")) {
 					exData.put("colService", serviceID);
 					exData.put("colRequestId", "NULL");
 					exData.put("colActStatus", "NULL");
@@ -449,7 +434,117 @@ public class IPcleanup {
 
 			}
 		}
-		System.out.println("==============================================ASRI CLEANUP END===================================================\n\n");
+		System.out.println(
+				"==============================================ASRI CLEANUP END===================================================\n\n");
+		if (resourceType.size() > 0) {
+			if (resourceType.get(0).contains("Internet Access")) {
+				isInternetService = true;
+			}
+		}
+		return isInternetService;
+
+	}
+
+	public static boolean deleteServicefromArm(String serviceID, String serviceType) {
+		System.out.println(
+				"==============================================ASRI CLEANUP START=================================================");
+		boolean serviceCleanedInAsri = false;
+		boolean isInternetService = false;
+		String resolvedUrl = Test1_SASI.replaceAll("service_type", serviceType);
+		resolvedUrl = resolvedUrl + serviceID;
+//		System.out.println(resolvedUrl);
+		String serviceBody = given().relaxedHTTPSValidation().get(resolvedUrl).body().asString();
+		ArrayList<String> resourceId = JsonPath.read(serviceBody, "$..resources[*].id");
+		ArrayList<String> resourceType = JsonPath.read(serviceBody, "$..resources[0].type");
+		if (resourceId.size() > 0) {
+			System.out.println("Service found in TEST1\nresourceId::" + resourceId.get(0));
+			String[] deleteUrl = Test1_SASI.split("service_type");
+			String resolvedDeleteUrl = deleteUrl[0] + serviceType + "/".concat(resourceId.get(0));
+			System.out.println(resolvedDeleteUrl);
+			String delResBody = given().relaxedHTTPSValidation().delete(resolvedDeleteUrl).body().asString();
+			System.out.println(delResBody);
+			if (delResBody.contains("successfully")) {
+				serviceCleanedInAsri = true;
+				exVar_AsriStatus = "CLEANED";
+				exData.put("colAsri_Status", exVar_AsriStatus);
+				if (exVar_Environment.equalsIgnoreCase("NULL")) {
+					exVar_Environment = "TEST1";
+					exData.put("colEnvironment", exVar_Environment);
+				}
+				// updation for endpoint
+				if (serviceID.contains("_")) {
+					exData.put("colService", serviceID);
+					exData.put("colRequestId", "NULL");
+					exData.put("colActStatus", "NULL");
+					exData.put("colActId", "NULL");
+					exData.put("colDeactivateJobId", "NULL");
+					exData.put("colError", "NULL");
+				}
+
+			} else {
+
+				exVar_AsriStatus = "NOT CLEANED";
+				exData.put("colAsri_Status", exVar_AsriStatus);
+				if (serviceID.contains("_")) {
+					exData.put("colService", serviceID);
+					exData.put("colRequestId", "NULL");
+					exData.put("colActStatus", "NULL");
+					exData.put("colActId", "NULL");
+					exData.put("colDeactivateJobId", "NULL");
+					exData.put("colError", "NULL");
+				}
+			}
+		} else {
+			System.out.println("Service not found in Test1..checking in Test4");
+			resolvedUrl = Test4_SASI.replaceAll("service_type", serviceType);
+			resolvedUrl = resolvedUrl + serviceID;
+//			System.out.println(resolvedUrl);
+			serviceBody = given().relaxedHTTPSValidation().get(resolvedUrl).body().asString();
+			resourceId = JsonPath.read(serviceBody, "$..resources[*].id");
+			resourceType = JsonPath.read(serviceBody, "$..resources[0].type");
+			if (resourceId.size() > 0) {
+				System.out.println("Service found in TEST4\nresourceId::" + resourceId.get(0));
+				String[] deleteUrl = Test4_SASI.split("service_type");
+				String resolvedDeleteUrl = deleteUrl[0] + serviceType + "/".concat(resourceId.get(0));
+//				System.out.println(resolvedDeleteUrl);
+				String delResBody = given().relaxedHTTPSValidation().delete(resolvedDeleteUrl).body().asString();
+				System.out.println(delResBody);
+				if (delResBody.contains("successfully")) {
+					serviceCleanedInAsri = true;
+					exVar_AsriStatus = "CLEANED";
+					exData.put("colAsri_Status", exVar_AsriStatus);
+					if (exVar_Environment.equalsIgnoreCase("NULL")) {
+						exVar_Environment = "TEST4";
+						exData.put("colEnvironment", exVar_Environment);
+					}
+					if (serviceID.contains("_")) {
+						exData.put("colService", serviceID);
+						exData.put("colRequestId", "NULL");
+						exData.put("colActStatus", "NULL");
+						exData.put("colActId", "NULL");
+						exData.put("colDeactivateJobId", "NULL");
+						exData.put("colError", "NULL");
+						exData.put("colIP_Status", "NULL");
+					}
+				}
+			} else {
+				System.out.println("Service not found in Test4 also");
+				exVar_AsriStatus = "NOT FOUND/CLEANED";
+				exData.put("colAsri_Status", exVar_AsriStatus);
+				if (serviceID.contains("_")) {
+					exData.put("colService", serviceID);
+					exData.put("colRequestId", "NULL");
+					exData.put("colActStatus", "NULL");
+					exData.put("colActId", "NULL");
+					exData.put("colDeactivateJobId", "NULL");
+					exData.put("colError", "NULL");
+					exData.put("colIP_Status", "NULL");
+				}
+
+			}
+		}
+		System.out.println(
+				"==============================================ASRI CLEANUP END===================================================\n\n");
 		if (resourceType.size() > 0) {
 			if (resourceType.get(0).contains("Internet Access")) {
 				isInternetService = true;
@@ -460,7 +555,8 @@ public class IPcleanup {
 	}
 
 	public static boolean cleanIp(String serviceID) {
-		System.out.println("==============================================IP CLEANUP START=================================================");
+		System.out.println(
+				"==============================================IP CLEANUP START=================================================");
 		boolean isIpCleaned = false;
 		String resolvedIpUrl = Test_GET_IP + serviceID;
 		String iPResBody = given().relaxedHTTPSValidation().get(resolvedIpUrl).body().asString();
@@ -489,25 +585,42 @@ public class IPcleanup {
 			exVar_IpStatus = "NOT OCCUPIED/CLEANED";
 			exData.put("colIP_Status", exVar_IpStatus);
 		}
-		System.out.println("==============================================IP CLEANUP END===================================================\n\n");
+		System.out.println(
+				"==============================================IP CLEANUP END===================================================\n\n");
 		return isIpCleaned;
 
 	}
 
 	public static ArrayList<Map<String, String>> actAuthentication() {
 
-		Response Test1_response = given().relaxedHTTPSValidation().auth().preemptive().basic(username, password)
-				.header("authorization", "QUM3MDA2ODpBcnNoaTE5OTQ=").get(Test1_authUrl);
-		Map<String, String> Test1_cook = Test1_response.cookies();
-
-		Response Test4_response = given().relaxedHTTPSValidation().auth().preemptive().basic(username, password)
-				.header("authorization", "QUM3MDA2ODpBcnNoaTE5OTQ=").get(Test4_authUrl);
-		Map<String, String> Test4_cook = Test4_response.cookies();
-
+		// Set basic authentication header
+		String auth = username + ":" + password;
+		String authHeader = "";
+		byte[] encodedAuth;
 		ArrayList<Map<String, String>> cookiesMap = new ArrayList<Map<String, String>>();
-		cookiesMap.add(Test1_cook);
-		cookiesMap.add(Test4_cook);
+		try {
+			encodedAuth = Base64.encodeBase64(auth.getBytes("UTF-8"));
+			authHeader = new String(encodedAuth);
+			Response Test1_response = given().relaxedHTTPSValidation().auth().preemptive().basic(username, password)
+					.header("authorization", authHeader).get(Test1_authUrl);
+			Map<String, String> Test1_cook = Test1_response.cookies();
 
+			Response Test4_response = given().relaxedHTTPSValidation().auth().preemptive().basic(username, password)
+					.header("authorization", authHeader).get(Test4_authUrl);
+			Map<String, String> Test4_cook = Test4_response.cookies();
+
+			Response Test2_response = given().relaxedHTTPSValidation().auth().preemptive().basic(username, password)
+					.header("authorization", authHeader).get(Test2_authUrl);
+			Map<String, String> Test2_cook = Test2_response.cookies();
+
+			cookiesMap.add(Test1_cook);
+			cookiesMap.add(Test4_cook);
+			cookiesMap.add(Test2_cook);
+
+		} catch (UnsupportedEncodingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		return cookiesMap;
 	}
 
@@ -522,21 +635,25 @@ public class IPcleanup {
 		JSONObject xmlJSONObj = XML.toJSONObject(x);
 		String jsonPrettyPrintString1 = xmlJSONObj.toString(4);
 //		System.out.println(jsonPrettyPrintString1);
-		requestID = getRequestID(jsonPrettyPrintString1, activity);
-		if (requestID != null) {
-			System.out.println("RequestID found in Test1::" + requestID);
+//		requestID = getRequestID(jsonPrettyPrintString1, activity);
+		// enhanacement for requestID
+		ArrayList<String> requestIDs = getRequestIDs("serviceAlias", "1");
+		if (requestIDs.size() > 0) {
+			requestID = Integer.parseInt(requestIDs.get(0).split("&&")[0]);
+			activity = requestIDs.get(0).split("&&")[2];
+
+			System.out.println("RequestID found in Test1::" + requestID + " for activity::" + activity);
 			System.out.println(
 					"ACT Url::" + "http://act-env1.idc1.level3.com:8081/ac-ip-rs-web/#/activation/" + requestID);
 			AUTOPILOT.environment = "1";
 			exVar_Environment = "TEST1";
 			exVar_RequestId = requestID;
 			exData.put("colEnvironment", exVar_Environment);
-			if(activity.equalsIgnoreCase("delete")) {
+			if (activity.equalsIgnoreCase("delete")) {
 				exData.put("colRequestId", "Delete::" + exVar_RequestId);
-			}else if(activity.equalsIgnoreCase("deactivate")) {
+			} else if (activity.equalsIgnoreCase("deactivate")) {
 				exData.put("colRequestId", "Deactivate::" + exVar_RequestId);
-			}
-			else {
+			} else {
 				exData.put("colRequestId", "Create::" + exVar_RequestId);
 			}
 			// fetching info using requestID
@@ -550,7 +667,7 @@ public class IPcleanup {
 					"$..item[?(@.name=='header.identifier')].value");
 			if (identifier_id_list.size() > 0 && header_identifier_list.size() > 0) {
 				identifier_id = (String) identifier_id_list.get(0);
-				header_identifier = (String) header_identifier_list.get(0);
+				header_identifier = String.valueOf(header_identifier_list.get(0));
 				actInfo.add(identifier_id);
 				actInfo.add(header_identifier);
 			}
@@ -562,9 +679,13 @@ public class IPcleanup {
 			String jsonPrettyPrintString4 = xmlJSONObj.toString(4);
 //		        System.out.println("====================================================");
 //		        System.out.println(jsonPrettyPrintString4);
-			requestID = getRequestID(jsonPrettyPrintString4, activity);
-			if (requestID != null) {
-				System.out.println("RequestID found in Test4::" + requestID);
+//			requestID = getRequestID(jsonPrettyPrintString4, activity);
+			// enhanacement for requestID
+			requestIDs = getRequestIDs("serviceAlias", "4");
+			if (requestIDs.size() > 0) {
+				requestID = Integer.parseInt(requestIDs.get(0).split("&&")[0]);
+				activity = requestIDs.get(0).split("&&")[2];
+				System.out.println("RequestID found in Test4::" + requestID + " for activity::" + activity);
 				System.out.println(
 						"ACT Url::" + "http://act-env4.idc1.level3.com:8081/ac-ip-rs-web/#/activation/" + requestID);
 				AUTOPILOT.environment = "4";
@@ -577,11 +698,11 @@ public class IPcleanup {
 //				} else {
 //					exData.put("colRequestId", "Create::" + exVar_RequestId);
 //				}
-				if(activity.equalsIgnoreCase("delete")) {
+				if (activity.equalsIgnoreCase("delete")) {
 					exData.put("colRequestId", "Delete::" + exVar_RequestId);
-				}else if(activity.equalsIgnoreCase("deactivate")) {
+				} else if (activity.equalsIgnoreCase("deactivate")) {
 					exData.put("colRequestId", "Deactivate::" + exVar_RequestId);
-				}else {
+				} else {
 					exData.put("colRequestId", "Create::" + exVar_RequestId);
 				}
 
@@ -594,30 +715,73 @@ public class IPcleanup {
 						"$..item[?(@.name=='header.identifier')].value");
 				if (identifier_id_list.size() > 0 && header_identifier_list.size() > 0) {
 					identifier_id = (String) identifier_id_list.get(0);
-					header_identifier = (String) header_identifier_list.get(0);
+					header_identifier = String.valueOf(header_identifier_list.get(0));
 					actInfo.add(identifier_id);
 					actInfo.add(header_identifier);
 				}
 
 			} else {
-				System.out.println("RequestID not found in Test4 also");
-				exVar_IpStatus = "NULL";
-				exVar_AsriStatus = "NULL";
-				exVar_ActStatus = "NULL";
-				exVar_RequestId = 0;
-				exVar_IdentifierId = "NULL";
-				exVar_ActId = "NULL";
-				exVar_Error = "NULL";
-				exVar_DeactivateJobId = "NULL";
-				exVar_Environment = "NULL";
+				System.out.println("RequestID not found in Test4, checking in Test2");
+				x = given().cookies(cookiesMap.get(2)).when().get(Test2_fetch + serviceAlias).body().asString();
+				xmlJSONObj = XML.toJSONObject(x);
+				String jsonPrettyPrintString2 = xmlJSONObj.toString(4);
+				// System.out.println("====================================================");
+				// System.out.println(jsonPrettyPrintString2);
+//				requestID = getRequestID(jsonPrettyPrintString2, activity);
+				// enhanacement for requestID
+				requestIDs = getRequestIDs("serviceAlias", "2");
+				if (requestIDs.size() > 0) {
+					requestID = Integer.parseInt(requestIDs.get(0).split("&&")[0]);
+					activity = requestIDs.get(0).split("&&")[2];
+					System.out.println("RequestID found in Test2::" + requestID + " for activity::" + activity);
+					System.out.println("ACT Url::" + "http://act-env2.idc1.level3.com:8081/ac-ip-rs-web/#/activation/"
+							+ requestID);
+					AUTOPILOT.environment = "2";
+					exVar_Environment = "TEST2";
+					exVar_RequestId = requestID;
+					exData.put("colEnvironment", exVar_Environment);
+					if (activity.equalsIgnoreCase("delete")) {
+						exData.put("colRequestId", "Delete::" + exVar_RequestId);
+					} else if (activity.equalsIgnoreCase("deactivate")) {
+						exData.put("colRequestId", "Deactivate::" + exVar_RequestId);
+					} else {
+						exData.put("colRequestId", "Create::" + exVar_RequestId);
+					}
+					x = given().when().get(Test2_fetchDetailsFromReqId + requestID).body().asString();
+					xmlJSONObj = XML.toJSONObject(x);
+					jsonPrettyPrintString2 = xmlJSONObj.toString(4);
+					ArrayList identifier_id_list = JsonPath.read(jsonPrettyPrintString2,
+							"$..item[?(@.name=='identifier_id')].value");
+					ArrayList header_identifier_list = JsonPath.read(jsonPrettyPrintString2,
+							"$..item[?(@.name=='header.identifier')].value");
+					if (identifier_id_list.size() > 0 && header_identifier_list.size() > 0) {
+						identifier_id = (String) identifier_id_list.get(0);
+						header_identifier = String.valueOf(header_identifier_list.get(0));
+						actInfo.add(identifier_id);
+						actInfo.add(header_identifier);
+					}
 
-				exData.put("colEnvironment", exVar_Environment);
-				exData.put("colRequestId", exVar_RequestId);
-				exData.put("colActStatus", exVar_ActStatus);
-				exData.put("colActId", exVar_ActStatus);
-				exData.put("colDeactivateJobId", exVar_DeactivateJobId);
-				exData.put("colError", exVar_Error);
+				} else {
+					System.out.println("RequestID not found in Test2 also");
 
+					exVar_IpStatus = "NULL";
+					exVar_AsriStatus = "NULL";
+					exVar_ActStatus = "NULL";
+					exVar_RequestId = 0;
+					exVar_IdentifierId = "NULL";
+					exVar_ActId = "NULL";
+					exVar_Error = "NULL";
+					exVar_DeactivateJobId = "NULL";
+					exVar_Environment = "NULL";
+
+					exData.put("colEnvironment", exVar_Environment);
+					exData.put("colRequestId", exVar_RequestId);
+					exData.put("colActStatus", exVar_ActStatus);
+					exData.put("colActId", exVar_ActStatus);
+					exData.put("colDeactivateJobId", exVar_DeactivateJobId);
+					exData.put("colError", exVar_Error);
+
+				}
 			}
 		}
 
@@ -631,7 +795,8 @@ public class IPcleanup {
 		Integer requestID = null;
 		if (requestIdLength.size() == 1) {
 			ArrayList<String> requestActivity = JsonPath.read(jsonPrettyPrintString, "$..data[3].data");
-			if (requestActivity.size() > 0 && (activity.equalsIgnoreCase("delete") || activity.equalsIgnoreCase("deactivate"))) {
+			if (requestActivity.size() > 0
+					&& (activity.equalsIgnoreCase("delete") || activity.equalsIgnoreCase("deactivate"))) {
 				String activityFound = requestActivity.get(0);
 				if (activityFound.equalsIgnoreCase("new")) {
 					requestID = null;
@@ -664,30 +829,45 @@ public class IPcleanup {
 		} else {
 			ArrayList givenServiceType = JsonPath.read(jsonPrettyPrintString, "$..data[5].data");
 			int serviceTypeSize = givenServiceType.size();
-			if(serviceTypeSize>0) {
-				String serviceTypeName = (String) givenServiceType.get(serviceTypeSize-1);
+			if (serviceTypeSize > 0) {
+				String serviceTypeName = (String) givenServiceType.get(serviceTypeSize - 1);
 //				System.out.println("Given input is of Type::"+serviceTypeName);
-				
+
 				for (int i = 0; i < requestIdLength.size(); i++) {
 					ArrayList isRequestType = JsonPath.read(jsonPrettyPrintString, "$..rows[" + i + "]..data[3].data");
-					ArrayList isRequestComplete = JsonPath.read(jsonPrettyPrintString, "$..rows[" + i + "]..data[0].data");
-					ArrayList<String> serviceType = JsonPath.read(jsonPrettyPrintString, "$..rows[" + i + "]..data[5].data");
-					
+					ArrayList isRequestComplete = JsonPath.read(jsonPrettyPrintString,
+							"$..rows[" + i + "]..data[0].data");
+					ArrayList<String> serviceType = JsonPath.read(jsonPrettyPrintString,
+							"$..rows[" + i + "]..data[5].data");
+
 					ArrayList idNewRequest = null;
 					String reqType = null;
 					String reqComplete = null;
 
-
 					if (isRequestType.size() > 0) {
 						reqType = (String) isRequestType.get(0);
 						reqComplete = (String) isRequestComplete.get(0);
-						if (reqType.equalsIgnoreCase(activity) && reqComplete.equalsIgnoreCase("complete") && serviceTypeName.equalsIgnoreCase(serviceType.get(0))) {
-							idNewRequest = JsonPath.read(jsonPrettyPrintString, "$..rows[" + i + "]..requestID");
-							if (idNewRequest.size() > 0) {
-								System.out.println("Given input is of Type::"+serviceTypeName);
-								requestID = (Integer) idNewRequest.get(0);
+						if (activity.equalsIgnoreCase("deactivate")) {
+							if (reqType.equalsIgnoreCase(activity) && reqComplete.equalsIgnoreCase("complete")) {
+								idNewRequest = JsonPath.read(jsonPrettyPrintString, "$..rows[" + i + "]..requestID");
+								if (idNewRequest.size() > 0) {
+									System.out.println("Given input is of Type::" + serviceTypeName);
+									requestID = (Integer) idNewRequest.get(0);
+									break;
+								}
+							}
+						} else {
+							if (reqType.equalsIgnoreCase(activity) && reqComplete.equalsIgnoreCase("complete")
+									&& serviceTypeName.equalsIgnoreCase(serviceType.get(0))) {
+								idNewRequest = JsonPath.read(jsonPrettyPrintString, "$..rows[" + i + "]..requestID");
+								if (idNewRequest.size() > 0) {
+									System.out.println("Given input is of Type::" + serviceTypeName);
+									requestID = (Integer) idNewRequest.get(0);
+									break;
+								}
 							}
 						}
+
 //						else if (reqType.equalsIgnoreCase(activity) && reqComplete.equalsIgnoreCase("complete") && serviceTypeName.equalsIgnoreCase("service")) {
 //							idNewRequest = JsonPath.read(jsonPrettyPrintString, "$..rows[" + i + "]..requestID");
 //							if (idNewRequest.size() > 0) {
@@ -697,28 +877,47 @@ public class IPcleanup {
 					}
 				}
 			}
-			
+
 		}
 
 		return requestID;
 	}
-	
-	public static LinkedHashMap<Integer, String> getNewRequestIDs(String serviceAlias, String activity) {
-		
-		ArrayList<Map<String, String>> cookiesMap = actAuthentication();
-		ArrayList<String> actInfo = new ArrayList<String>();
-		Integer requestID = null;
-		String identifier_id = null;
-		String header_identifier = null;
 
-		String x = given().cookies(cookiesMap.get(0)).when().get(Test1_fetch + serviceAlias).body().asString();
-		JSONObject xmlJSONObj = XML.toJSONObject(x);
-		String jsonPrettyPrintString = xmlJSONObj.toString(4);
+	public static ArrayList<String> getRequestIDs(String serviceAlias, String environment) {
+
+		ArrayList<Map<String, String>> cookiesMap = actAuthentication();
+		ArrayList<String> ReqID_ServiceType_ReqType = new ArrayList<String>();
+		String actJsonResponse = null;
+
+		if (environment.contains("1")) {
+			actJsonResponse = RestAssured.given().cookies(cookiesMap.get(0)).when()
+					.get("http://act-env1.idc1.level3.com:8081/ac-ip-rs-web/rs/view/default/data?q0=" + serviceAlias)
+					.body().asString();
+		} else if (environment.contains("2")) {
+			actJsonResponse = RestAssured.given().cookies(cookiesMap.get(2)).when()
+					.get("http://act-env2.idc1.level3.com:8081/ac-ip-rs-web/rs/view/default/data?q0=" + serviceAlias)
+					.body().asString();
+		} else if (environment.contains("4")) {
+			actJsonResponse = RestAssured.given().cookies(cookiesMap.get(1)).when()
+					.get("http://act-env4.idc1.level3.com:8081/ac-ip-rs-web/rs/view/default/data?q0=" + serviceAlias)
+					.body().asString();
+		}
 		
+		if (actJsonResponse.contains("Unauthorized")) {
+			System.out.println("\n\n\n+-------------------------------------------------+");
+			System.out.println("ACT Login Failed..\nPlease check the credentials and try again..");
+			System.out.println("+-------------------------------------------------+");
+			System.exit(0);
+		}
+
+		JSONObject xmlJSONObj = XML.toJSONObject(actJsonResponse);
+		String jsonPrettyPrintString = xmlJSONObj.toString(4);
+
 		ArrayList requestIdLength = JsonPath.read(jsonPrettyPrintString, "$..requestID");
 		LinkedHashMap<Integer, String> newRequestIdMap = new LinkedHashMap<Integer, String>();
 		Integer requestId = null;
-		if (requestIdLength.size() == 1) {			{
+		if (requestIdLength.size() == 1) {
+			{
 				ArrayList isRequestType = JsonPath.read(jsonPrettyPrintString, "$..data[3].data");
 				ArrayList isRequestComplete = JsonPath.read(jsonPrettyPrintString, "$..data[0].data");
 				ArrayList<String> serviceType = JsonPath.read(jsonPrettyPrintString, "$..data[5].data");
@@ -735,114 +934,508 @@ public class IPcleanup {
 						idNewRequest = JsonPath.read(jsonPrettyPrintString, "$..requestID");
 						if (idNewRequest.size() > 0) {
 							requestId = (Integer) idNewRequest.get(0);
-							newRequestIdMap.put(requestId,serviceTypeName);
+							newRequestIdMap.put(requestId, serviceTypeName + "_" + reqType);
+							ReqID_ServiceType_ReqType
+									.add(requestId.toString() + "&&" + serviceTypeName + "&&" + reqType);
 						}
 					}
 				}
 			}
-		}else {
+		} else {
 			ArrayList givenServiceType = JsonPath.read(jsonPrettyPrintString, "$..data[5].data");
 			int serviceTypeSize = givenServiceType.size();
-			if(serviceTypeSize>0) {
-//				String serviceTypeName = (String) givenServiceType.get(serviceTypeSize-1);
-//				System.out.println("Given input is of Type::"+serviceTypeName);
-				
+			if (serviceTypeSize > 0) {
+				String serviceTypeName = (String) givenServiceType.get(serviceTypeSize - 1);
+				// System.out.println("Given input is of Type::"+serviceTypeName);
+
 				for (int i = 0; i < requestIdLength.size(); i++) {
 					ArrayList isRequestType = JsonPath.read(jsonPrettyPrintString, "$..rows[" + i + "]..data[3].data");
-					ArrayList isRequestComplete = JsonPath.read(jsonPrettyPrintString, "$..rows[" + i + "]..data[0].data");
-					ArrayList<String> serviceType = JsonPath.read(jsonPrettyPrintString, "$..rows[" + i + "]..data[5].data");
-					
+					ArrayList isRequestComplete = JsonPath.read(jsonPrettyPrintString,
+							"$..rows[" + i + "]..data[0].data");
+					ArrayList<String> serviceType = JsonPath.read(jsonPrettyPrintString,
+							"$..rows[" + i + "]..data[5].data");
+
 					ArrayList idNewRequest = null;
 					String reqType = null;
 					String reqComplete = null;
-					String serviceTypeName = null;
-
+					String innerServiceTypeName = null;
 
 					if (isRequestType.size() > 0) {
 						reqType = (String) isRequestType.get(0);
 						reqComplete = (String) isRequestComplete.get(0);
-						serviceTypeName = (String) serviceType.get(0);
-						if (reqType.equalsIgnoreCase(activity) && reqComplete.equalsIgnoreCase("complete")) {
+						innerServiceTypeName = (String) serviceType.get(0);
+						// if (reqType.equalsIgnoreCase(activity) &&
+						// reqComplete.equalsIgnoreCase("complete")) {
+						if (reqComplete.equalsIgnoreCase("complete")
+								&& innerServiceTypeName.equalsIgnoreCase(serviceTypeName)
+								&& (reqType.equalsIgnoreCase("new") || reqType.equalsIgnoreCase("delete"))) {
 							idNewRequest = JsonPath.read(jsonPrettyPrintString, "$..rows[" + i + "]..requestID");
 							if (idNewRequest.size() > 0) {
-								System.out.println("Given input is of Type::"+serviceTypeName);
+								// System.out.println("Given input is of Type::"+serviceTypeName);
 								requestId = (Integer) idNewRequest.get(0);
-								newRequestIdMap.put(requestId,serviceTypeName );
-								System.out.println(serviceTypeName+"::"+requestId);
+								newRequestIdMap.put(requestId, innerServiceTypeName + "_" + reqType);
+								ReqID_ServiceType_ReqType
+										.add(requestId.toString() + "&&" + innerServiceTypeName + "&&" + reqType);
+								// System.out.println(serviceTypeName+"::"+requestId+"::"+reqType);
 							}
 						}
 					}
 				}
 			}
-			
+
+		}
+
+		return ReqID_ServiceType_ReqType;
+
+	}
+
+	public static boolean networkCleanup(String service, String env_, String workflow) {
+
+		// Logic to clean up the network
+		// If network is cleaned up successfully, return true
+		// Else return false
+		boolean actCleanupStatus = false;
+		// Autopilot autopilot = new Autopilot();
+		// set the environment
+//		ap.environment = env_;
+
+		exVar_ServiceAlias = service;
+		exData.put("colService", exVar_ServiceAlias);
+
+		ArrayList<String> envs = new ArrayList<String>();
+		if (env_.equalsIgnoreCase("null") || env_.equalsIgnoreCase("") || env_==null) {
+			envs.add("1");
+			envs.add("2");
+			envs.add("4");
+		} else {
+			envs.add(env_);
 		}
 		
-		return newRequestIdMap;
-		
+
+		// get the request ids
+		ArrayList<String> ReqID_ServiceType_ReqType = new ArrayList<String>();
+
+		for (String env : envs) {
+			System.out.println("Checking RequestID for the Service::" + service + " in the " + env + " environment");
+			ReqID_ServiceType_ReqType = getRequestIDs(service, env);
+			if (ReqID_ServiceType_ReqType.size() > 0) {
+				ap.environment = env;
+				environment = env;
+				System.out.println("RequestID found for the Service::" + service + " in the " + env + " environment");
+				break;
+			} else {
+					System.out.println("RequestID not found  in the " + env + " environment");
+			}
+		}
+
+		if (ReqID_ServiceType_ReqType.size() == 0) {
+			
+			exData.put("colActStatus", "NOT FOUND");
+			exData.put("colActId", "NULL");
+			exData.put("colDeactivateJobId", "NULL");
+			exData.put("colError", "NULL");
+			exData.put("colRequestId", "NULL");
+			exData.put("colEnvironment", "NULL");
+//			actCleanupStatus = true;
+			actCleanupStatus = false;
+			return actCleanupStatus;
+		} else if (ReqID_ServiceType_ReqType.size() > 0) {
+			if (ReqID_ServiceType_ReqType.get(0).contains("delete")) {
+				ArrayList<String> actInfo = new ArrayList<String>();
+				actInfo = getActDetailsUsingRequestID(ReqID_ServiceType_ReqType.get(0).split("&&")[0], environment);
+				if (actInfo.size() > 0) {
+					String identifier_id = actInfo.get(0);
+					String header_identifier = actInfo.get(1);
+					String portName = null;
+					String deviceName = null;
+					
+					try {
+						portName = actInfo.get(2);
+						deviceName = actInfo.get(3);						
+					} catch (Exception e) {
+						portName = null;
+						deviceName = null;
+					}
+					
+					
+					// cleanup the network
+					System.out.println("\n=======================ACT CLEANUP START============================");
+					System.out.println(
+							"Act request found for ServiceID::" + service + " in the environment::" + environment);
+					System.out.println("Network cleanup already done for ServiceID::" + service + "\nIDENTIFIER_ID::"
+							+ identifier_id + "\nHEADER_IDENTIFIER::" + header_identifier 
+							);
+					actCleanupStatus = true;
+					
+//					if(!environment.contains("4")) {
+//						System.out.println("\nAs the Network is already cleaned, skipping the network cleanup for the service::"+service + " in the environment::"+environment);
+//						if (environment.contains("1")) {
+//							boolean test2CleanupStatus = networkCleanup(service, "TEST2", workflow);
+//							if (test2CleanupStatus) {
+//								boolean test4CleanupStatus = networkCleanup(service, "TEST4", workflow);
+//								if (test4CleanupStatus) {
+//									exVar_ActStatus = "CLEANED";
+//									exVar_ActId = identifier_id;
+//									exVar_Environment = environment.toLowerCase().contains("test") ? environment
+//											: "TEST" + environment;
+//									exData.put("colActStatus", exVar_ActStatus);
+//									exData.put("colActId", exVar_ActId);
+//									exData.put("colError", "NULL");
+//									exData.put("colRequestId", "NULL");
+//									exData.put("colEnvironment", exVar_Environment);
+//									System.out.println(
+//											"\n=======================ACT CLEANUP END============================");
+//								} else {
+//									exVar_ActStatus = "NOT CLEANED";
+//									exVar_ActId = identifier_id;
+//									exVar_Environment = environment.toLowerCase().contains("test") ? environment
+//											: "TEST" + environment;
+//									exData.put("colActStatus", exVar_ActStatus);
+//									exData.put("colActId", exVar_ActId);
+//									exData.put("colError", "NULL");
+//									exData.put("colRequestId", "NULL");
+//									exData.put("colEnvironment", exVar_Environment);
+//									actCleanupStatus = false;
+//									System.out.println(
+//											"\n=======================ACT CLEANUP END============================");
+//								}
+//							}
+//						} else if (environment.contains("2")) {
+//							boolean test4CleanupStatus = networkCleanup(service, "4", workflow);
+//							if (test4CleanupStatus) {
+//								exVar_ActStatus = "CLEANED";
+//								exVar_ActId = identifier_id;
+//								exVar_Environment = environment.toLowerCase().contains("test") ? environment
+//										: "TEST" + environment;
+//								exData.put("colActStatus", exVar_ActStatus);
+//								exData.put("colActId", exVar_ActId);
+//								exData.put("colError", "NULL");
+//								exData.put("colRequestId", "NULL");
+//								exData.put("colEnvironment", exVar_Environment);
+//								System.out.println(
+//										"\n=======================ACT CLEANUP END============================");
+//							} else {
+//								exVar_ActStatus = "NOT CLEANED";
+//								exVar_ActId = identifier_id;
+//								exVar_Environment = environment.toLowerCase().contains("test") ? environment
+//										: "TEST" + environment;
+//								exData.put("colActStatus", exVar_ActStatus);
+//								exData.put("colActId", exVar_ActId);
+//								exData.put("colError", "NULL");
+//								exData.put("colRequestId", "NULL");
+//								exData.put("colEnvironment", exVar_Environment);
+//								actCleanupStatus = false;
+//								System.out.println(
+//										"\n=======================ACT CLEANUP END============================");
+//							}
+//						} else if (environment.contains("4")) {
+//							exVar_ActStatus = "CLEANED";
+//							exVar_ActId = identifier_id;
+//							exVar_Environment = environment.toLowerCase().contains("test") ? environment
+//									: "TEST" + environment;
+//							exData.put("colActStatus", exVar_ActStatus);
+//							exData.put("colActId", exVar_ActId);
+//							exData.put("colError", "NULL");
+//							exData.put("colRequestId", "NULL");
+//							exData.put("colEnvironment", exVar_Environment);
+//							actCleanupStatus = true;
+//							System.out.println("\n=======================ACT CLEANUP END============================");
+//						}
+//					}else {
+//						exVar_ActStatus = "ALREADY CLEANED";
+//						exVar_Environment = environment.toLowerCase().contains("test") ? environment : "TEST"+environment;
+//						exVar_ActId = identifier_id;
+//						exData.put("colActStatus", exVar_ActStatus);
+//						exData.put("colActId", "Already Delete::" + exVar_ActId);
+//						exData.put("colError", "NULL");
+//						exData.put("colDeactivateJobId", "NULL");
+//						exData.put("colRequestId", "NULL");
+//						exData.put("colEnvironment", exVar_Environment);
+//						System.out.println("\n=======================ACT CLEANUP END============================");
+//						
+//					}
+					
+					
+					
+					
+					// updating the status in excel
+//					exVar_ActStatus = "ALREADY CLEANED";
+//					exVar_Environment = environment.toLowerCase().contains("test") ? environment : "TEST"+environment;
+//					exVar_ActId = identifier_id;
+//					exData.put("colActStatus", exVar_ActStatus);
+//					exData.put("colActId", "Already Delete::" + exVar_ActId);
+//					exData.put("colError", "NULL");
+//					exData.put("colDeactivateJobId", "NULL");
+//					exData.put("colRequestId", "NULL");
+//					exData.put("colEnvironment", exVar_Environment);
+//					System.out.println("\n=======================ACT CLEANUP END============================");
+//					
+					
+				}
+			} else {
+				// get the act details using request id
+				ArrayList<String> actInfo = new ArrayList<String>();
+				actInfo = getActDetailsUsingRequestID(ReqID_ServiceType_ReqType.get(0).split("&&")[0], environment);
+				if (actInfo.size() > 0) {
+					String identifier_id = actInfo.get(0);
+					String header_identifier = actInfo.get(1);
+					// cleanup the network
+					System.out.println("\n=======================ACT CLEANUP START============================");
+					System.out.println(
+							"Act request found for ServiceID::" + service + " in the environment::" + environment);
+					System.out.println("Network cleanup is in progress for ServiceID::" + service + "\nidentifier_id::"
+							+ identifier_id + "\nheader_identifier::" + header_identifier);
+
+					String token = ap.getToken(username, password);
+					// perform network cleanup
+					
+					
+					//-----------------------------------------------------------------//
+					
+					if (workflow == null || workflow.equalsIgnoreCase("null")||workflow.equalsIgnoreCase("")) {
+						System.out.println("Specific Workflow is not provided for ACT Cleanup, so defaulting to \"LNAAS_DELETE_TRANSACTION_ACT_TL_V1\"");
+						workflow = "delete";
+					}
+					
+					if (workflow.equalsIgnoreCase("delete")) {
+						// perform delete transaction
+						
+						// System.out.println("Logging into Autopilot\nToken
+						// generated::"+token+"\nLogged in Successfully");
+						// System.out.println("Logging into Autopilot\nLogged in Successfully");
+						String jobid_ = ap.triggerWorkflow(identifier_id, header_identifier,
+								"LNAAS_DELETE_TRANSACTION_ACT_TL_V1", token);
+						exData.put("colDeactivateJobId", jobid_);
+						System.out
+								.println("Triggering workflow::\"LNAAS_DELETE_TRANSACTION_ACT_TL_V1\"\nJob id::" + jobid_);
+						try {
+							System.out.println("Is Workflow completed?::" + ap.getWorkflowStatus(jobid_, token));
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
+
+						try {
+							String errorString = ap.getTaskDetail(jobid_, "e5b9", "$..outgoing.return_value", token);
+							if (errorString != null) {
+								System.out.println("Delete Transaction from ACT completed Successfully");
+								String successDelActId = ap.getTaskDetail(jobid_, "14bc", "$..actIdentifierId", token);
+								exVar_ActStatus = "CLEANED";
+								exVar_ActId = successDelActId;
+								exVar_Environment = environment.toLowerCase().contains("test") ? environment : "TEST"+environment;
+								exData.put("colActStatus", exVar_ActStatus);
+								exData.put("colActId", exVar_ActId);
+								exData.put("colError", "NULL");
+								exData.put("colRequestId", "NULL");
+								exData.put("colEnvironment",exVar_Environment);
+								
+
+								actCleanupStatus = true;
+								System.out
+										.println("Delete Transaction from ACT completed Successfully::" + successDelActId);
+								System.out.println("\n=======================ACT CLEANUP END============================");
+							} else {
+								errorString = ap.getTaskDetail(jobid_, "51ed", "$..outgoing..message", token);
+								String delActId = ap.getTaskDetail(jobid_, "51ed", "$..outgoing..actID", token);
+								System.out.println("DELETE Transaction failed with error::");
+								System.out.println(
+										"+-----------+---------+-----------+---------+-----------+---------+-----------+---------+-----------+---------+");
+								System.out.println(errorString);
+								System.out.println(
+										"+-----------+---------+-----------+---------+-----------+---------+-----------+---------+-----------+---------+");
+								System.out.println("Failed to delete Transaction from ACT::" + delActId);
+
+								exVar_Error = errorString;
+								exData.put("colError", exVar_Error);
+								exVar_ActStatus = "NOT CLEANED";
+								exVar_ActId = delActId;
+								exVar_Environment = environment.toLowerCase().contains("test") ? environment : "TEST"+environment;
+								exData.put("colActStatus", exVar_ActStatus);
+								exData.put("colActId", exVar_ActId);
+								exData.put("colRequestId", "NULL");
+								exData.put("colEnvironment",exVar_Environment);
+								actCleanupStatus = false;
+								
+								System.out.println("\n=======================ACT CLEANUP END============================");
+							}
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
+						
+					} else if (workflow.equalsIgnoreCase("deactivate")) {
+						// perform deactivate transaction
+//						System.out.println(
+//								"\n===Triggering DEACTIVATE workflow as we got error using DELETE workflow===\n");
+						String jobid_ = ap.triggerWorkflow(identifier_id,header_identifier , "Deactivate_Transaction_ACT", token);
+						System.out
+								.println("Triggering workflow::\"DEACTIVATE_TRANSACTION_ACT\"\nJob id::" + jobid_);
+						exVar_DeactivateJobId = jobid_;
+						exData.put("colDeactivateJobId", "Deactivate::" + exVar_DeactivateJobId);
+						try {
+							System.out.println("Is Workflow completed?::" + ap.getWorkflowStatus(jobid_, token));
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
+						try {
+							String errorString = ap.getTaskDetail(jobid_, "2375", "$..outgoing.return_value", token);
+							if (errorString != null) {
+								System.out.println("Deactivation completed Successfully");
+								actCleanupStatus = true;
+//								String successDelActId = ap.getTaskDetail(jobid_, "662a","$..actIdentifierId", token);
+								exVar_Environment = environment.toLowerCase().contains("test") ? environment : "TEST"+environment;
+								exData.put("colActStatus", "CLEANED");
+								exData.put("colRequestId", "NULL");
+								exData.put("colActId", "NULL");
+								exData.put("colError", "NULL");
+								exData.put("colEnvironment", exVar_Environment);
+							} else {
+								errorString = ap.getTaskDetail(jobid_, "51ed", "$..outgoing..response", token);
+//								delActId = ap.getTaskDetail(jobid_, "51ed","$..outgoing..actID", token);
+								System.out.println("Deactivation failed with error::");
+								System.out.println("............................................................");
+								System.out.println(errorString);
+								System.out.println("............................................................");
+								exVar_Error = errorString;
+								exVar_Environment = environment.toLowerCase().contains("test") ? environment : "TEST"+environment;
+								exData.put("colError", exVar_Error);
+
+								exVar_ActStatus = "NOT CLEANED";
+								exData.put("colActStatus", exVar_ActStatus);
+								exData.put("colActId", "DEACTIVATE::" + "NULL");
+								exData.put("colRequestId", "DEACTIVATE::" + "NULL");
+								exData.put("colEnvironment", exVar_Environment);
+
+							}
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
+						
+						
+					}
+					else {
+						System.out.println("Invalid Workflow provided for ACT Cleanup");
+						exVar_Error = "Invalid Workflow provided for ACT Cleanup";
+						exData.put("colError", exVar_Error);
+						exVar_ActStatus = "NOT CLEANED";
+						exData.put("colActStatus", exVar_ActStatus);
+						exData.put("colActId", "NULL");
+						exData.put("colRequestId", "NULL");
+					}
+
+					
+
+				}
+			}
+		}
+		return actCleanupStatus;
 	}
-	
-	
+
+	public static ArrayList<String> getActDetailsUsingRequestID(String requestId, String environment) {
+		ArrayList<String> actInfo = new ArrayList<String>();
+		String actJsonResponse = null;
+		String identifier_id = null;
+		String header_identifier = null;
+		String portName = null;
+		String deviceName = null;
+
+		if (environment.contains("1")) {
+			actJsonResponse = RestAssured.given().when()
+					.get("http://act-env1.idc1.level3.com:8081/ac-ip-rs-web/rs/requestPayload?requestID=" + requestId)
+					.body().asString();
+		} else if (environment.contains("2")) {
+			actJsonResponse = RestAssured.given().when()
+					.get("http://act-env2.idc1.level3.com:8081/ac-ip-rs-web/rs/requestPayload?requestID=" + requestId)
+					.body().asString();
+		} else if (environment.contains("4")) {
+			actJsonResponse = RestAssured.given().when()
+					.get("http://act-env4.idc1.level3.com:8081/ac-ip-rs-web/rs/requestPayload?requestID=" + requestId)
+					.body().asString();
+		}
+		JSONObject xmlJSONObj = XML.toJSONObject(actJsonResponse);
+		String jsonPrettyPrintString = xmlJSONObj.toString(4);
+
+		ArrayList identifier_id_list = JsonPath.read(jsonPrettyPrintString,
+				"$..item[?(@.name=='identifier_id')].value");
+		ArrayList header_identifier_list = JsonPath.read(jsonPrettyPrintString,
+				"$..item[?(@.name=='header.identifier')].value");
+		ArrayList portNameList = JsonPath.read(jsonPrettyPrintString, "$..item[?(@.name=='body.devices.ports[0].port')].value");
+		ArrayList deviceNameList = JsonPath.read(jsonPrettyPrintString, "$..item[?(@.name=='body.devices.device')].value");
+		if (identifier_id_list.size() > 0 && header_identifier_list.size() > 0) {
+			identifier_id = (String) identifier_id_list.get(0);
+			header_identifier = String.valueOf(header_identifier_list.get(0));
+			actInfo.add(identifier_id);
+			actInfo.add(header_identifier);
+			if (portNameList.size() > 0) {
+//				portName = (String) portNameList.get(0);
+//				actInfo.add(portName);
+			}
+			if (deviceNameList.size() > 0) {
+//				deviceName = (String) deviceNameList.get(0);
+//				actInfo.add(deviceName);
+			}
+		}
+
+		return actInfo;
+	}
+
 	public static void fetchActDetailsUsingRequestId(LinkedHashMap<Integer, String> getNewRequestIDs) {
 		Iterator it = getNewRequestIDs.entrySet().iterator();
 		while (it.hasNext()) {
 			Map.Entry pair = (Map.Entry) it.next();
 //			System.out.println(pair.getKey() + " = " + pair.getValue());
-			
+
 			Integer requestID = (Integer) pair.getKey();
-			
+
 			String x = given().when().get(Test1_fetchDetailsFromReqId + requestID).body().asString();
 			JSONObject xmlJSONObj = XML.toJSONObject(x);
 			String jsonPrettyPrintString = xmlJSONObj.toString(4);
-			
-			ArrayList productType = JsonPath.read(jsonPrettyPrintString,"$..item[?(@.name=='body.productType')].value");
-			
-			
-			ArrayList ovcAlias = JsonPath.read(jsonPrettyPrintString,"$..item[?(@.name=='body.productType')].value");
-			if(productType.size()>0) {
+
+			ArrayList productType = JsonPath.read(jsonPrettyPrintString,
+					"$..item[?(@.name=='body.productType')].value");
+
+			ArrayList ovcAlias = JsonPath.read(jsonPrettyPrintString, "$..item[?(@.name=='body.productType')].value");
+			if (productType.size() > 0) {
 				String productypeName = (String) productType.get(0);
 				switch (productypeName) {
 				case "port":
-						System.out.println("Cleaning port");
-						ArrayList<String> portAlias = JsonPath.read(jsonPrettyPrintString,"$..item[?(@.name=='body.devices.ports[0].serviceId')].value");
-						if(portAlias.size()>0) {
-							ServiceCleanupUtility.cleanPort(requestID, portAlias.get(0));
-						}
-						
+					System.out.println("Cleaning port");
+					ArrayList<String> portAlias = JsonPath.read(jsonPrettyPrintString,
+							"$..item[?(@.name=='body.devices.ports[0].serviceId')].value");
+					if (portAlias.size() > 0) {
+						ServiceCleanupUtility.cleanPort(requestID, portAlias.get(0));
+					}
+
 					break;
-					
+
 				case "elanEvpl":
-						System.out.println("Cleaning service ELAN EVPL");
-						ArrayList<String> evcAlias = JsonPath.read(jsonPrettyPrintString,"$..item[?(@.name=='body.vrf[0].serviceId')].value");
-						if(evcAlias.size()>0) {
-							ServiceCleanupUtility.cleanelanEvpl(requestID, evcAlias.get(0));
-						}
+					System.out.println("Cleaning service ELAN EVPL");
+					ArrayList<String> evcAlias = JsonPath.read(jsonPrettyPrintString,
+							"$..item[?(@.name=='body.vrf[0].serviceId')].value");
+					if (evcAlias.size() > 0) {
+						ServiceCleanupUtility.cleanelanEvpl(requestID, evcAlias.get(0));
+					}
 					break;
-				
+
 				case "build_ethernet_path":
 					System.out.println("Cleaning service build_ethernet_path");
-					ArrayList<String> olineAlias = JsonPath.read(jsonPrettyPrintString,"$..item[?(@.name=='body.endpoints[0].networkPath.serviceId')].value");
-					if(olineAlias.size()>0) {
+					ArrayList<String> olineAlias = JsonPath.read(jsonPrettyPrintString,
+							"$..item[?(@.name=='body.endpoints[0].networkPath.serviceId')].value");
+					if (olineAlias.size() > 0) {
 						ServiceCleanupUtility.clean_build_ethernet_path_usingRequestId(requestID, olineAlias.get(0));
-					}					
-				break;
+					}
+					break;
 
 				default:
 					break;
 				}
 			}
 //			System.out.println(productType.get(0));
-			
-			
-			
-			
-			
-			
+
 		}
 	}
-	
+
 	public static boolean cleanFromACT(Integer requestID) {
 		boolean result = false;
-		
+
 		String x = given().when().get(IPcleanup.Test1_fetchDetailsFromReqId + requestID).body().asString();
 		JSONObject xmlJSONObj = XML.toJSONObject(x);
 		String jsonPrettyPrintString = xmlJSONObj.toString(4);
@@ -853,18 +1446,17 @@ public class IPcleanup {
 		if (identifier_id_list.size() > 0 && header_identifier_list.size() > 0) {
 			String identifier_id = (String) identifier_id_list.get(0);
 			String header_identifier = (String) header_identifier_list.get(0);
-			
-			System.out.println("identifier_id::"+identifier_id);
-			System.out.println("header_identifier::"+header_identifier);
-			
+
+			System.out.println("identifier_id::" + identifier_id);
+			System.out.println("header_identifier::" + header_identifier);
+
 			{
 				String token = ap.getToken(username, password);
 //				System.out.println("Logging into Autopilot\nToken generated::"+token+"\nLogged in Successfully");
-				System.out.println("Logging into Autopilot\nLogged in Successfully");
-				String jobid_ = ap.triggerWorkflow(identifier_id, header_identifier, "LNAAS_DELETE_TRANSACTION_ACT_TL_V1",
-						token);
-				System.out.println(
-						"Triggering workflow::\"LNAAS_DELETE_TRANSACTION_ACT_TL_V1\"\n Job id::" + jobid_);
+//				System.out.println("Logging into Autopilot\nLogged in Successfully");
+				String jobid_ = ap.triggerWorkflow(identifier_id, header_identifier,
+						"LNAAS_DELETE_TRANSACTION_ACT_TL_V1", token);
+				System.out.println("Triggering workflow::\"LNAAS_DELETE_TRANSACTION_ACT_TL_V1\"\n Job id::" + jobid_);
 
 				try {
 					System.out.println("Is Workflow completed?::" + ap.getWorkflowStatus(jobid_, token));
@@ -885,37 +1477,31 @@ public class IPcleanup {
 						System.out.println("............................................................");
 
 						// Triggering DEACTIVATE workflow as we got error using DELETE workflow
-						if (errorString != null || AUTOPILOT.iterationCount>=20) {
+						if (errorString != null || AUTOPILOT.iterationCount >= 20) {
 							System.out.println(
 									"\n===Triggering DEACTIVATE workflow as we got error using DELETE workflow===\n");
 							jobid_ = ap.triggerWorkflow(identifier_id, header_identifier, "Deactivate_Transaction_ACT",
 									token);
-							System.out.println(
-									"Triggering workflow::\"DEACTIVATE_TRANSACTION_ACT\"\n job id::" + jobid_);
-							
+							System.out
+									.println("Triggering workflow::\"DEACTIVATE_TRANSACTION_ACT\"\n job id::" + jobid_);
+
 							try {
-								System.out.println(
-										"Is Workflow completed?::" + ap.getWorkflowStatus(jobid_, token));
+								System.out.println("Is Workflow completed?::" + ap.getWorkflowStatus(jobid_, token));
 							} catch (InterruptedException e) {
 								e.printStackTrace();
 							}
 							try {
-								errorString = ap.getTaskDetail(jobid_, "2375", "$..outgoing.return_value",
-										token);
+								errorString = ap.getTaskDetail(jobid_, "2375", "$..outgoing.return_value", token);
 								if (errorString != null) {
 									System.out.println("Deactivation completed Successfully");
 //									String successDelActId = ap.getTaskDetail(jobid_, "662a","$..actIdentifierId", token);
 								} else {
-									errorString = ap.getTaskDetail(jobid_, "51ed", "$..outgoing..response",
-											token);
+									errorString = ap.getTaskDetail(jobid_, "51ed", "$..outgoing..response", token);
 //									delActId = ap.getTaskDetail(jobid_, "51ed","$..outgoing..actID", token);
 									System.out.println("Deactivation failed with error::");
-									System.out.println(
-											"............................................................");
+									System.out.println("............................................................");
 									System.out.println(errorString);
-									System.out.println(
-											"............................................................");
-
+									System.out.println("............................................................");
 
 								}
 							} catch (InterruptedException e) {
@@ -927,50 +1513,49 @@ public class IPcleanup {
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
-			} 
+			}
 		}
-		
-		
+
 		return result;
 	}
-	
-	
-public static ArrayList<String> getParentServices(String serviceID) {
-		
+
+	public static ArrayList<String> getParentServices(String serviceID) {
+
 		String resolvedUrl = IPcleanup.Test1_SASI.replaceAll("service_type", "services");
-		resolvedUrl = resolvedUrl+serviceID;
+		resolvedUrl = resolvedUrl + serviceID;
 		String serviceBody = given().relaxedHTTPSValidation().get(resolvedUrl).body().asString();
 		ArrayList<String> parentServiceName = JsonPath.read(serviceBody, "$..parentServices[*].name");
-		if(parentServiceName.size()==0) {
-			System.out.println("No Parent services found in Test1, checking in Test4");
+		if (parentServiceName.size() == 0) {
+//			System.out.println("No Parent services found in Test1, checking in Test4");
 			resolvedUrl = IPcleanup.Test4_SASI.replaceAll("service_type", "services");
-			resolvedUrl = resolvedUrl+serviceID;
+			resolvedUrl = resolvedUrl + serviceID;
 			serviceBody = given().relaxedHTTPSValidation().get(resolvedUrl).body().asString();
 			parentServiceName = JsonPath.read(serviceBody, "$..parentServices[*].name");
-			if(parentServiceName.size()<0) {
-				System.out.println("No Parent services found in Test4 also");				
+			if (parentServiceName.size() < 0) {
+//				System.out.println("No Parent services found in Test4 also");
+				IPcleanup.parentServiceEnvironment = null;
 			}
-		}else {
+		} else {
 			String serviceFromEndpoint[];
 			for (String parent : parentServiceName) {
-				if(parent.contains("_")) {
-					serviceFromEndpoint= parent.split("_");
-					if(!parentServiceName.contains(serviceFromEndpoint)) {
+				if (parent.contains("_")) {
+					serviceFromEndpoint = parent.split("_");
+					if (!parentServiceName.contains(serviceFromEndpoint)) {
 						parentServiceName.add(serviceFromEndpoint[0]);
 						break;
-					}					
-					
+					}
+
 				}
 			}
 		}
-		if(parentServiceName.size()==0) {
-			System.out.println("\nNo Parent Associated to the given ServiceID::"+serviceID);
-		}else {
+		if (parentServiceName.size() == 0) {
+//			System.out.println("\nNo Parent Associated to the given ServiceID::"+serviceID);
+		} else {
 			String serviceFromEndpoint[];
 			for (String parent : parentServiceName) {
-				if(parent.contains("_")) {
-					serviceFromEndpoint= parent.split("_");
-					if(!parentServiceName.contains(serviceFromEndpoint[0])) {
+				if (parent.contains("_")) {
+					serviceFromEndpoint = parent.split("_");
+					if (!parentServiceName.contains(serviceFromEndpoint[0])) {
 						parentServiceName.add(serviceFromEndpoint[0]);
 						break;
 					}
@@ -978,9 +1563,14 @@ public static ArrayList<String> getParentServices(String serviceID) {
 			}
 			System.out.println(
 					"\n+-----------+---------+-----------+---------+-----------+---------+-----------+---------+-----------+---------+");
-			System.out.println("Parent services associated to the given ServiceID::"+serviceID);
-			System.out.println(
-					"========================================================================");
+			System.out.println("Parent services associated to the given ServiceID::" + serviceID);
+//			System.out.println(
+//					"========================================================================");
+//			for (String parent : parentServiceName) {
+//				System.out.println(parent);
+//			}
+//			Collections.reverse(parentServiceName);
+			System.out.println("========================================================================");
 			for (String parent : parentServiceName) {
 				System.out.println(parent);
 			}
@@ -988,23 +1578,921 @@ public static ArrayList<String> getParentServices(String serviceID) {
 					"+-----------+---------+-----------+---------+-----------+---------+-----------+---------+-----------+---------+");
 		}
 		return parentServiceName;
-		
+
+	}
+
+	public static boolean deleteServicefromInventory(String serviceID, String serviceType) {
+		System.out.println(
+				"==============================================ASRI CLEANUP START=================================================");
+		boolean serviceCleanedInAsri = false;
+		boolean isInternetService = false;
+		String resType = null;
+		String resName = null;
+
+		String resolvedUrl = Test1_SASI.replaceAll("service_type", serviceType);
+		resolvedUrl = resolvedUrl + serviceID;
+//	System.out.println(resolvedUrl);
+		String serviceBody = given().relaxedHTTPSValidation().get(resolvedUrl).body().asString();
+		ArrayList<String> resourceId = JsonPath.read(serviceBody, "$..resources[*].id");
+		ArrayList<String> resourceType = JsonPath.read(serviceBody, "$..resources[0].type");
+		//checking environment also
+		if (resourceId.size() > 0 && exVar_Environment.contains("1")) {
+			// setting environment
+			AUTOPILOT.environment = "1";
+			System.out.println("Service found in TEST1\nresourceId::" + resourceId.get(0));
+
+			String resTypeFormatted = resourceType.get(0).replaceAll("\\s+", "").toLowerCase();
+
+			if (resTypeFormatted.equalsIgnoreCase("uni")) {
+				resName = "unis";
+				resType = "Uni";
+			} else if (resTypeFormatted.equalsIgnoreCase("oline")) {
+				resName = "olines";
+				resType = "OLine";
+			} else if (resTypeFormatted.equalsIgnoreCase("internetaccess")) {
+				resName = "internetaccesses";
+				resType = "InternetAccess";
+			} else if (resTypeFormatted.equalsIgnoreCase("ovc")) {
+				resName = "ovcs";
+				resType = "Ovc";
+			} else if (resTypeFormatted.equalsIgnoreCase("evc")) {
+				resName = "evcs";
+				resType = "Evc";
+			} else if (resTypeFormatted.equalsIgnoreCase("mp-evc")) {
+				resName = "mpevcs";
+				resType = "MpEvc";
+			} else if (resTypeFormatted.equalsIgnoreCase("ovcendPoint")) {
+				resName = "ovcendpoints";
+				resType = "OvcEndpoint";
+			} else if (resTypeFormatted.equalsIgnoreCase("evcendPoint")) {
+				resName = "evcendpoints";
+				resType = "EvcEndpoint";
+			} else if (resTypeFormatted.equalsIgnoreCase("mp-evcendpoint")) {
+				resName = "mpevcendpoints";
+				resType = "MpEvcEndpoint";
+			} else if (resTypeFormatted.equalsIgnoreCase("ipvpnendpoint")) {
+				resName = "ipvpnendpoints";
+				resType = "IpVpnEndpoint";
+			}
+
+			String resName_resType = resName + "_" + resType;
+
+			String token = ap.getToken(username, password);
+//		System.out.println("Logging into Autopilot\nToken generated::"+token+"\nLogged in Successfully");
+//		System.out.println("Logging into Autopilot\nLogged in Successfully");
+			String jobid_ = ap.triggerWorkflow(resName_resType, serviceID, "Delete_ResourceByFilter_ASRI_AL", token);
+
+			System.out.println("Triggering workflow::\"Delete_ResourceByFilter_ASRI_AL\"\nJob id::" + jobid_);
+
+			String delResBody = "";
+			try {
+				System.out.println("Is Workflow completed?::" + ap.getWorkflowStatus(jobid_, token));
+				delResBody = ap.getTaskDetail(jobid_, "7858", "$..outgoing..return_data", token);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+
+			System.out.println(delResBody);
+			if (delResBody != null && delResBody.contains("successfully")) {
+				serviceCleanedInAsri = true;
+				exVar_AsriStatus = "CLEANED";
+				exData.put("colAsri_Status", exVar_AsriStatus);
+				if (exVar_Environment.equalsIgnoreCase("NULL")) {
+					exVar_Environment = "TEST1";
+					exData.put("colEnvironment", exVar_Environment);
+				}
+				// updation for endpoint
+				if (serviceID.contains("_")) {
+					exData.put("colService", serviceID);
+					exData.put("colRequestId", "NULL");
+					exData.put("colActStatus", "NULL");
+					exData.put("colActId", "NULL");
+					exData.put("colDeactivateJobId", "NULL");
+					exData.put("colError", "NULL");
+				}
+
+			} else {
+
+				exVar_AsriStatus = "NOT CLEANED";
+				exData.put("colAsri_Status", exVar_AsriStatus);
+				if (serviceID.contains("_")) {
+					exData.put("colService", serviceID);
+					exData.put("colRequestId", "NULL");
+					exData.put("colActStatus", "NULL");
+					exData.put("colActId", "NULL");
+					exData.put("colDeactivateJobId", "NULL");
+					exData.put("colError", "NULL");
+				}
+			}
+		} else {
+//			System.out.println("Service not found in Test1..checking in Test4");//-----------> Commented
+			resolvedUrl = Test4_SASI.replaceAll("service_type", serviceType);
+			resolvedUrl = resolvedUrl + serviceID;
+//		System.out.println(resolvedUrl);
+			serviceBody = given().relaxedHTTPSValidation().get(resolvedUrl).body().asString();
+			resourceId = JsonPath.read(serviceBody, "$..resources[*].id");
+			resourceType = JsonPath.read(serviceBody, "$..resources[0].type");
+			if (resourceId.size() > 0 && exVar_Environment.contains("4")) {  //----------------> Added
+				// setting environment
+				AUTOPILOT.environment = "4";
+				System.out.println("Service found in TEST4\nresourceId::" + resourceId.get(0));
+
+				String resTypeFormatted = resourceType.get(0).replaceAll("\\s+", "").toLowerCase();
+
+				if (resTypeFormatted.equalsIgnoreCase("uni")) {
+					resName = "unis";
+					resType = "Uni";
+				} else if (resTypeFormatted.equalsIgnoreCase("oline")) {
+					resName = "olines";
+					resType = "OLine";
+				} else if (resTypeFormatted.equalsIgnoreCase("internetaccess")) {
+					resName = "internetaccesses";
+					resType = "InternetAccess";
+				} else if (resTypeFormatted.equalsIgnoreCase("ovc")) {
+					resName = "ovcs";
+					resType = "Ovc";
+				} else if (resTypeFormatted.equalsIgnoreCase("evc")) {
+					resName = "evcs";
+					resType = "Evc";
+				} else if (resTypeFormatted.equalsIgnoreCase("mp-evc")) {
+					resName = "mpevcs";
+					resType = "MpEvc";
+				} else if (resTypeFormatted.equalsIgnoreCase("ovcendPoint")) {
+					resName = "ovcendpoints";
+					resType = "OvcEndpoint";
+				} else if (resTypeFormatted.equalsIgnoreCase("evcendPoint")) {
+					resName = "evcendpoints";
+					resType = "EvcEndpoint";
+				} else if (resTypeFormatted.equalsIgnoreCase("mp-evcendpoint")) {
+					resName = "mpevcendpoints";
+					resType = "MpEvcEndpoint";
+				} else if (resTypeFormatted.equalsIgnoreCase("ipvpnendpoint")) {
+					resName = "ipvpnendpoints";
+					resType = "IpVpnEndpoint";
+				}
+
+				String resName_resType = resName + "_" + resType;
+
+				String token = ap.getToken(username, password);
+//			System.out.println("Logging into Autopilot\nToken generated::"+token+"\nLogged in Successfully");
+//			System.out.println("Logging into Autopilot\nLogged in Successfully");
+				String jobid_ = ap.triggerWorkflow(resName_resType, serviceID, "Delete_ResourceByFilter_ASRI_AL",
+						token);
+
+				System.out.println("Triggering workflow::\"Delete_ResourceByFilter_ASRI_AL\"\nJob id::" + jobid_);
+
+				String delResBody = "";
+				try {
+					System.out.println("Is Workflow completed?::" + ap.getWorkflowStatus(jobid_, token));
+					delResBody = ap.getTaskDetail(jobid_, "7858", "$..outgoing..return_data", token);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+
+				System.out.println(delResBody);
+				if (delResBody != null && delResBody.contains("successfully")) {
+					serviceCleanedInAsri = true;
+					exVar_AsriStatus = "CLEANED";
+					exData.put("colAsri_Status", exVar_AsriStatus);
+					if (exVar_Environment.equalsIgnoreCase("NULL")) {
+						exVar_Environment = "TEST4";
+						exData.put("colEnvironment", exVar_Environment);
+					}
+					// updation for endpoint
+					if (serviceID.contains("_")) {
+						exData.put("colService", serviceID);
+						exData.put("colRequestId", "NULL");
+						exData.put("colActStatus", "NULL");
+						exData.put("colActId", "NULL");
+						exData.put("colDeactivateJobId", "NULL");
+						exData.put("colError", "NULL");
+					}
+
+				} else {
+
+					exVar_AsriStatus = "NOT CLEANED";
+					exData.put("colAsri_Status", exVar_AsriStatus);
+					if (serviceID.contains("_")) {
+						exData.put("colService", serviceID);
+						exData.put("colRequestId", "NULL");
+						exData.put("colActStatus", "NULL");
+						exData.put("colActId", "NULL");
+						exData.put("colDeactivateJobId", "NULL");
+						exData.put("colError", "NULL");
+					}
+				}
+			} else {
+				
+				
+				{
+//					System.out.println("Service not found in Test4..checking in Test2");//-----------> Commented
+					resolvedUrl = Test2_SASI.replaceAll("service_type", serviceType);
+					resolvedUrl = resolvedUrl + serviceID;
+//				System.out.println(resolvedUrl);
+					serviceBody = given().relaxedHTTPSValidation().get(resolvedUrl).body().asString();
+					resourceId = JsonPath.read(serviceBody, "$..resources[*].id");
+					resourceType = JsonPath.read(serviceBody, "$..resources[0].type");
+					if (resourceId.size() > 0 && exVar_Environment.contains("2")) { //----------------> Added
+						// setting environment
+						AUTOPILOT.environment = "2";
+						System.out.println("Service found in TEST2\nresourceId::" + resourceId.get(0));
+
+						String resTypeFormatted = resourceType.get(0).replaceAll("\\s+", "").toLowerCase();
+
+						if (resTypeFormatted.equalsIgnoreCase("uni")) {
+							resName = "unis";
+							resType = "Uni";
+						} else if (resTypeFormatted.equalsIgnoreCase("oline")) {
+							resName = "olines";
+							resType = "OLine";
+						} else if (resTypeFormatted.equalsIgnoreCase("internetaccess")) {
+							resName = "internetaccesses";
+							resType = "InternetAccess";
+						} else if (resTypeFormatted.equalsIgnoreCase("ovc")) {
+							resName = "ovcs";
+							resType = "Ovc";
+						} else if (resTypeFormatted.equalsIgnoreCase("evc")) {
+							resName = "evcs";
+							resType = "Evc";
+						} else if (resTypeFormatted.equalsIgnoreCase("mp-evc")) {
+							resName = "mpevcs";
+							resType = "MpEvc";
+						} else if (resTypeFormatted.equalsIgnoreCase("ovcendPoint")) {
+							resName = "ovcendpoints";
+							resType = "OvcEndpoint";
+						} else if (resTypeFormatted.equalsIgnoreCase("evcendPoint")) {
+							resName = "evcendpoints";
+							resType = "EvcEndpoint";
+						} else if (resTypeFormatted.equalsIgnoreCase("mp-evcendpoint")) {
+							resName = "mpevcendpoints";
+							resType = "MpEvcEndpoint";
+						} else if (resTypeFormatted.equalsIgnoreCase("ipvpnendpoint")) {
+							resName = "ipvpnendpoints";
+							resType = "IpVpnEndpoint";
+						}
+
+						String resName_resType = resName + "_" + resType;
+
+						String token = ap.getToken(username, password);
+//					System.out.println("Logging into Autopilot\nToken generated::"+token+"\nLogged in Successfully");
+//					System.out.println("Logging into Autopilot\nLogged in Successfully");
+						String jobid_ = ap.triggerWorkflow(resName_resType, serviceID, "Delete_ResourceByFilter_ASRI_AL",
+								token);
+
+						System.out.println("Triggering workflow::\"Delete_ResourceByFilter_ASRI_AL\"\nJob id::" + jobid_);
+
+						String delResBody = "";
+						try {
+							System.out.println("Is Workflow completed?::" + ap.getWorkflowStatus(jobid_, token));
+							delResBody = ap.getTaskDetail(jobid_, "7858", "$..outgoing..return_data", token);
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
+
+						System.out.println(delResBody);
+						if (delResBody != null && delResBody.contains("successfully")) {
+							serviceCleanedInAsri = true;
+							exVar_AsriStatus = "CLEANED";
+							exData.put("colAsri_Status", exVar_AsriStatus);
+							if (exVar_Environment.equalsIgnoreCase("NULL")) {
+								exVar_Environment = "TEST2";
+								exData.put("colEnvironment", exVar_Environment);
+							}
+							// updation for endpoint
+							if (serviceID.contains("_")) {
+								exData.put("colService", serviceID);
+								exData.put("colRequestId", "NULL");
+								exData.put("colActStatus", "NULL");
+								exData.put("colActId", "NULL");
+								exData.put("colDeactivateJobId", "NULL");
+								exData.put("colError", "NULL");
+							}
+
+						} else {
+
+							exVar_AsriStatus = "NOT CLEANED";
+							exData.put("colAsri_Status", exVar_AsriStatus);
+							if (serviceID.contains("_")) {
+								exData.put("colService", serviceID);
+								exData.put("colRequestId", "NULL");
+								exData.put("colActStatus", "NULL");
+								exData.put("colActId", "NULL");
+								exData.put("colDeactivateJobId", "NULL");
+								exData.put("colError", "NULL");
+							}
+						}
+					} else {
+//						System.out.println("Service not found in Test2 also"); //----------------> Commented
+						System.out.println("No Service found in "+exVar_Environment);
+						exVar_AsriStatus = "NOT FOUND/CLEANED";
+						exData.put("colAsri_Status", exVar_AsriStatus);
+						if (serviceID.contains("_")) {
+							exData.put("colService", serviceID);
+							exData.put("colRequestId", "NULL");
+							exData.put("colActStatus", "NULL");
+							exData.put("colActId", "NULL");
+							exData.put("colDeactivateJobId", "NULL");
+							exData.put("colError", "NULL");
+							exData.put("colIP_Status", "NULL");
+						}
+
+					}
+				}
+				
+				
+//				exVar_AsriStatus = "NOT FOUND/CLEANED";
+//				exData.put("colAsri_Status", exVar_AsriStatus);
+//				if (serviceID.contains("_")) {
+//					exData.put("colService", serviceID);
+//					exData.put("colRequestId", "NULL");
+//					exData.put("colActStatus", "NULL");
+//					exData.put("colActId", "NULL");
+//					exData.put("colDeactivateJobId", "NULL");
+//					exData.put("colError", "NULL");
+//					exData.put("colIP_Status", "NULL");
+//				}
+
+			}
+			
+			//-----------------------------------------------------------------------------------------------------------------------//
+			
+		}
+		System.out.println(
+				"==============================================ASRI CLEANUP END===================================================\n\n");
+		return isInternetService;
+	}
+
+	public static boolean deleteServicefromInventoryOnly(String serviceID, String serviceType) {
+		System.out.println(
+				"==============================================ASRI CLEANUP START=================================================");
+		boolean serviceCleanedInAsri = false;
+		boolean isInternetService = false;
+		String resType = null;
+		String resName = null;
+
+		String resolvedUrl = Test1_SASI.replaceAll("service_type", serviceType);
+		resolvedUrl = resolvedUrl + serviceID;
+//	System.out.println(resolvedUrl);
+		String serviceBody = given().relaxedHTTPSValidation().get(resolvedUrl).body().asString();
+		ArrayList<String> resourceId = JsonPath.read(serviceBody, "$..resources[*].id");
+		ArrayList<String> resourceType = JsonPath.read(serviceBody, "$..resources[0].type");
+		//checking environment also
+		if (resourceId.size() > 0 ) {
+			// setting environment
+			AUTOPILOT.environment = "1";
+			System.out.println("Service found in TEST1\nresourceId::" + resourceId.get(0));
+
+			String resTypeFormatted = resourceType.get(0).replaceAll("\\s+", "").toLowerCase();
+
+			if (resTypeFormatted.equalsIgnoreCase("uni")) {
+				resName = "unis";
+				resType = "Uni";
+			} else if (resTypeFormatted.equalsIgnoreCase("oline")) {
+				resName = "olines";
+				resType = "OLine";
+			} else if (resTypeFormatted.equalsIgnoreCase("internetaccess")) {
+				resName = "internetaccesses";
+				resType = "InternetAccess";
+			} else if (resTypeFormatted.equalsIgnoreCase("ovc")) {
+				resName = "ovcs";
+				resType = "Ovc";
+			} else if (resTypeFormatted.equalsIgnoreCase("evc")) {
+				resName = "evcs";
+				resType = "Evc";
+			} else if (resTypeFormatted.equalsIgnoreCase("mp-evc")) {
+				resName = "mpevcs";
+				resType = "MpEvc";
+			} else if (resTypeFormatted.equalsIgnoreCase("ovcendPoint")) {
+				resName = "ovcendpoints";
+				resType = "OvcEndpoint";
+			} else if (resTypeFormatted.equalsIgnoreCase("evcendPoint")) {
+				resName = "evcendpoints";
+				resType = "EvcEndpoint";
+			} else if (resTypeFormatted.equalsIgnoreCase("mp-evcendpoint")) {
+				resName = "mpevcendpoints";
+				resType = "MpEvcEndpoint";
+			} else if (resTypeFormatted.equalsIgnoreCase("ipvpnendpoint")) {
+				resName = "ipvpnendpoints";
+				resType = "IpVpnEndpoint";
+			}
+
+			String resName_resType = resName + "_" + resType;
+
+			String token = ap.getToken(username, password);
+//		System.out.println("Logging into Autopilot\nToken generated::"+token+"\nLogged in Successfully");
+//		System.out.println("Logging into Autopilot\nLogged in Successfully");
+			String jobid_ = ap.triggerWorkflow(resName_resType, serviceID, "Delete_ResourceByFilter_ASRI_AL", token);
+
+			System.out.println("Triggering workflow::\"Delete_ResourceByFilter_ASRI_AL\"\nJob id::" + jobid_);
+
+			String delResBody = "";
+			try {
+				System.out.println("Is Workflow completed?::" + ap.getWorkflowStatus(jobid_, token));
+				delResBody = ap.getTaskDetail(jobid_, "7858", "$..outgoing..return_data", token);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+
+			System.out.println(delResBody);
+			if (delResBody != null && delResBody.contains("successfully")) {
+				serviceCleanedInAsri = true;
+				exVar_AsriStatus = "CLEANED";
+				exData.put("colAsri_Status", exVar_AsriStatus);
+				if (exVar_Environment.equalsIgnoreCase("NULL")) {
+					exVar_Environment = "TEST1";
+					exData.put("colEnvironment", exVar_Environment);
+				}
+				// updation for endpoint
+				if (serviceID.contains("_")) {
+					exData.put("colService", serviceID);
+					exData.put("colRequestId", "NULL");
+					exData.put("colActStatus", "NULL");
+					exData.put("colActId", "NULL");
+					exData.put("colDeactivateJobId", "NULL");
+					exData.put("colError", "NULL");
+				}
+
+			} else {
+
+				exVar_AsriStatus = "NOT CLEANED";
+				exData.put("colAsri_Status", exVar_AsriStatus);
+				if (serviceID.contains("_")) {
+					exData.put("colService", serviceID);
+					exData.put("colRequestId", "NULL");
+					exData.put("colActStatus", "NULL");
+					exData.put("colActId", "NULL");
+					exData.put("colDeactivateJobId", "NULL");
+					exData.put("colError", "NULL");
+				}
+			}
+		} else {
+//			System.out.println("Service not found in Test1..checking in Test4");//-----------> Commented
+			resolvedUrl = Test4_SASI.replaceAll("service_type", serviceType);
+			resolvedUrl = resolvedUrl + serviceID;
+//		System.out.println(resolvedUrl);
+			serviceBody = given().relaxedHTTPSValidation().get(resolvedUrl).body().asString();
+			resourceId = JsonPath.read(serviceBody, "$..resources[*].id");
+			resourceType = JsonPath.read(serviceBody, "$..resources[0].type");
+			if (resourceId.size() > 0 ) {  //----------------> Added
+				// setting environment
+				AUTOPILOT.environment = "4";
+				System.out.println("Service found in TEST4\nresourceId::" + resourceId.get(0));
+
+				String resTypeFormatted = resourceType.get(0).replaceAll("\\s+", "").toLowerCase();
+
+				if (resTypeFormatted.equalsIgnoreCase("uni")) {
+					resName = "unis";
+					resType = "Uni";
+				} else if (resTypeFormatted.equalsIgnoreCase("oline")) {
+					resName = "olines";
+					resType = "OLine";
+				} else if (resTypeFormatted.equalsIgnoreCase("internetaccess")) {
+					resName = "internetaccesses";
+					resType = "InternetAccess";
+				} else if (resTypeFormatted.equalsIgnoreCase("ovc")) {
+					resName = "ovcs";
+					resType = "Ovc";
+				} else if (resTypeFormatted.equalsIgnoreCase("evc")) {
+					resName = "evcs";
+					resType = "Evc";
+				} else if (resTypeFormatted.equalsIgnoreCase("mp-evc")) {
+					resName = "mpevcs";
+					resType = "MpEvc";
+				} else if (resTypeFormatted.equalsIgnoreCase("ovcendPoint")) {
+					resName = "ovcendpoints";
+					resType = "OvcEndpoint";
+				} else if (resTypeFormatted.equalsIgnoreCase("evcendPoint")) {
+					resName = "evcendpoints";
+					resType = "EvcEndpoint";
+				} else if (resTypeFormatted.equalsIgnoreCase("mp-evcendpoint")) {
+					resName = "mpevcendpoints";
+					resType = "MpEvcEndpoint";
+				} else if (resTypeFormatted.equalsIgnoreCase("ipvpnendpoint")) {
+					resName = "ipvpnendpoints";
+					resType = "IpVpnEndpoint";
+				}
+
+				String resName_resType = resName + "_" + resType;
+
+				String token = ap.getToken(username, password);
+//			System.out.println("Logging into Autopilot\nToken generated::"+token+"\nLogged in Successfully");
+//			System.out.println("Logging into Autopilot\nLogged in Successfully");
+				String jobid_ = ap.triggerWorkflow(resName_resType, serviceID, "Delete_ResourceByFilter_ASRI_AL",
+						token);
+
+				System.out.println("Triggering workflow::\"Delete_ResourceByFilter_ASRI_AL\"\nJob id::" + jobid_);
+
+				String delResBody = "";
+				try {
+					System.out.println("Is Workflow completed?::" + ap.getWorkflowStatus(jobid_, token));
+					delResBody = ap.getTaskDetail(jobid_, "7858", "$..outgoing..return_data", token);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+
+				System.out.println(delResBody);
+				if (delResBody != null && delResBody.contains("successfully")) {
+					serviceCleanedInAsri = true;
+					exVar_AsriStatus = "CLEANED";
+					exData.put("colAsri_Status", exVar_AsriStatus);
+					if (exVar_Environment.equalsIgnoreCase("NULL")) {
+						exVar_Environment = "TEST4";
+						exData.put("colEnvironment", exVar_Environment);
+					}
+					// updation for endpoint
+					if (serviceID.contains("_")) {
+						exData.put("colService", serviceID);
+						exData.put("colRequestId", "NULL");
+						exData.put("colActStatus", "NULL");
+						exData.put("colActId", "NULL");
+						exData.put("colDeactivateJobId", "NULL");
+						exData.put("colError", "NULL");
+					}
+
+				} else {
+
+					exVar_AsriStatus = "NOT CLEANED";
+					exData.put("colAsri_Status", exVar_AsriStatus);
+					if (serviceID.contains("_")) {
+						exData.put("colService", serviceID);
+						exData.put("colRequestId", "NULL");
+						exData.put("colActStatus", "NULL");
+						exData.put("colActId", "NULL");
+						exData.put("colDeactivateJobId", "NULL");
+						exData.put("colError", "NULL");
+					}
+				}
+			} else {
+				
+				
+				{
+//					System.out.println("Service not found in Test4..checking in Test2");//-----------> Commented
+					resolvedUrl = Test2_SASI.replaceAll("service_type", serviceType);
+					resolvedUrl = resolvedUrl + serviceID;
+//				System.out.println(resolvedUrl);
+					serviceBody = given().relaxedHTTPSValidation().get(resolvedUrl).body().asString();
+					resourceId = JsonPath.read(serviceBody, "$..resources[*].id");
+					resourceType = JsonPath.read(serviceBody, "$..resources[0].type");
+					if (resourceId.size() > 0 ) { //----------------> Added
+						// setting environment
+						AUTOPILOT.environment = "2";
+						System.out.println("Service found in TEST2\nresourceId::" + resourceId.get(0));
+
+						String resTypeFormatted = resourceType.get(0).replaceAll("\\s+", "").toLowerCase();
+
+						if (resTypeFormatted.equalsIgnoreCase("uni")) {
+							resName = "unis";
+							resType = "Uni";
+						} else if (resTypeFormatted.equalsIgnoreCase("oline")) {
+							resName = "olines";
+							resType = "OLine";
+						} else if (resTypeFormatted.equalsIgnoreCase("internetaccess")) {
+							resName = "internetaccesses";
+							resType = "InternetAccess";
+						} else if (resTypeFormatted.equalsIgnoreCase("ovc")) {
+							resName = "ovcs";
+							resType = "Ovc";
+						} else if (resTypeFormatted.equalsIgnoreCase("evc")) {
+							resName = "evcs";
+							resType = "Evc";
+						} else if (resTypeFormatted.equalsIgnoreCase("mp-evc")) {
+							resName = "mpevcs";
+							resType = "MpEvc";
+						} else if (resTypeFormatted.equalsIgnoreCase("ovcendPoint")) {
+							resName = "ovcendpoints";
+							resType = "OvcEndpoint";
+						} else if (resTypeFormatted.equalsIgnoreCase("evcendPoint")) {
+							resName = "evcendpoints";
+							resType = "EvcEndpoint";
+						} else if (resTypeFormatted.equalsIgnoreCase("mp-evcendpoint")) {
+							resName = "mpevcendpoints";
+							resType = "MpEvcEndpoint";
+						} else if (resTypeFormatted.equalsIgnoreCase("ipvpnendpoint")) {
+							resName = "ipvpnendpoints";
+							resType = "IpVpnEndpoint";
+						}
+
+						String resName_resType = resName + "_" + resType;
+
+						String token = ap.getToken(username, password);
+//					System.out.println("Logging into Autopilot\nToken generated::"+token+"\nLogged in Successfully");
+//					System.out.println("Logging into Autopilot\nLogged in Successfully");
+						String jobid_ = ap.triggerWorkflow(resName_resType, serviceID, "Delete_ResourceByFilter_ASRI_AL",
+								token);
+
+						System.out.println("Triggering workflow::\"Delete_ResourceByFilter_ASRI_AL\"\nJob id::" + jobid_);
+
+						String delResBody = "";
+						try {
+							System.out.println("Is Workflow completed?::" + ap.getWorkflowStatus(jobid_, token));
+							delResBody = ap.getTaskDetail(jobid_, "7858", "$..outgoing..return_data", token);
+						} catch (InterruptedException e) {
+							e.printStackTrace();
+						}
+
+						System.out.println(delResBody);
+						if (delResBody != null && delResBody.contains("successfully")) {
+							serviceCleanedInAsri = true;
+							exVar_AsriStatus = "CLEANED";
+							exData.put("colAsri_Status", exVar_AsriStatus);
+							if (exVar_Environment.equalsIgnoreCase("NULL")) {
+								exVar_Environment = "TEST2";
+								exData.put("colEnvironment", exVar_Environment);
+							}
+							// updation for endpoint
+							if (serviceID.contains("_")) {
+								exData.put("colService", serviceID);
+								exData.put("colRequestId", "NULL");
+								exData.put("colActStatus", "NULL");
+								exData.put("colActId", "NULL");
+								exData.put("colDeactivateJobId", "NULL");
+								exData.put("colError", "NULL");
+							}
+
+						} else {
+
+							exVar_AsriStatus = "NOT CLEANED";
+							exData.put("colAsri_Status", exVar_AsriStatus);
+							if (serviceID.contains("_")) {
+								exData.put("colService", serviceID);
+								exData.put("colRequestId", "NULL");
+								exData.put("colActStatus", "NULL");
+								exData.put("colActId", "NULL");
+								exData.put("colDeactivateJobId", "NULL");
+								exData.put("colError", "NULL");
+							}
+						}
+					} else {
+//						System.out.println("Service not found in Test2 also"); //----------------> Commented
+						System.out.println("No Service found in Inventory ");
+						exVar_AsriStatus = "NOT FOUND/CLEANED";
+						exData.put("colAsri_Status", exVar_AsriStatus);
+						if (serviceID.contains("_")) {
+							exData.put("colService", serviceID);
+							exData.put("colRequestId", "NULL");
+							exData.put("colActStatus", "NULL");
+							exData.put("colActId", "NULL");
+							exData.put("colDeactivateJobId", "NULL");
+							exData.put("colError", "NULL");
+							exData.put("colIP_Status", "NULL");
+						}
+
+					}
+				}
+				
+				
+//				exVar_AsriStatus = "NOT FOUND/CLEANED";
+//				exData.put("colAsri_Status", exVar_AsriStatus);
+//				if (serviceID.contains("_")) {
+//					exData.put("colService", serviceID);
+//					exData.put("colRequestId", "NULL");
+//					exData.put("colActStatus", "NULL");
+//					exData.put("colActId", "NULL");
+//					exData.put("colDeactivateJobId", "NULL");
+//					exData.put("colError", "NULL");
+//					exData.put("colIP_Status", "NULL");
+//				}
+
+			}
+			
+			//-----------------------------------------------------------------------------------------------------------------------//
+			
+		}
+		System.out.println(
+				"==============================================ASRI CLEANUP END===================================================\n\n");
+		return isInternetService;
 	}
 	
-	
+	public static boolean deleteServicefromArmInventory(String serviceID, String serviceType) {
+		System.out.println(
+				"==============================================ASRI CLEANUP START=================================================");
+		boolean serviceCleanedInAsri = false;
+		boolean isInternetService = false;
+		String resType = null;
+		String resName = null;
 
+		String resolvedUrl = Test1_SASI.replaceAll("service_type", serviceType);
+		resolvedUrl = resolvedUrl + serviceID;
+//	System.out.println(resolvedUrl);
+		String serviceBody = given().relaxedHTTPSValidation().get(resolvedUrl).body().asString();
+		ArrayList<String> resourceId = JsonPath.read(serviceBody, "$..resources[*].id");
+		ArrayList<String> resourceType = JsonPath.read(serviceBody, "$..resources[0].type");
+		if (resourceId.size() > 0) {
+			// setting environment
+			AUTOPILOT.environment = "1";
+			System.out.println("Service found in TEST1\nresourceId::" + resourceId.get(0));
 
+			String resTypeFormatted = resourceType.get(0).replaceAll("\\s+", "").toLowerCase();
 
+			if (resTypeFormatted.equalsIgnoreCase("uni")) {
+				resName = "unis";
+				resType = "Uni";
+			} else if (resTypeFormatted.equalsIgnoreCase("oline")) {
+				resName = "olines";
+				resType = "OLine";
+			} else if (resTypeFormatted.equalsIgnoreCase("internetaccess")) {
+				resName = "internetaccesses";
+				resType = "InternetAccess";
+			} else if (resTypeFormatted.equalsIgnoreCase("ovc")) {
+				resName = "ovcs";
+				resType = "Ovc";
+			} else if (resTypeFormatted.equalsIgnoreCase("evc")) {
+				resName = "evcs";
+				resType = "Evc";
+			} else if (resTypeFormatted.equalsIgnoreCase("mp-evc")) {
+				resName = "mpevcs";
+				resType = "MpEvc";
+			} else if (resTypeFormatted.equalsIgnoreCase("ovcendPoint")) {
+				resName = "ovcendpoints";
+				resType = "OvcEndpoint";
+			} else if (resTypeFormatted.equalsIgnoreCase("evcendPoint")) {
+				resName = "evcendpoints";
+				resType = "EvcEndpoint";
+			} else if (resTypeFormatted.equalsIgnoreCase("mp-evcendpoint")) {
+				resName = "mpevcendpoints";
+				resType = "MpEvcEndpoint";
+			} else if (resTypeFormatted.equalsIgnoreCase("ipvpnendpoint")) {
+				resName = "ipvpnendpoints";
+				resType = "IpVpnEndpoint";
+			}
 
+			String resName_resType = resName + "_" + resType;
+
+			String token = ap.getToken(username, password);
+//		System.out.println("Logging into Autopilot\nToken generated::"+token+"\nLogged in Successfully");
+//		System.out.println("Logging into Autopilot\nLogged in Successfully");
+			String jobid_ = ap.triggerWorkflow(resName_resType, serviceID, "Delete_ResourceByFilter_ASRI_AL", token);
+
+			System.out.println("Triggering workflow::\"Delete_ResourceByFilter_ASRI_AL\"\nJob id::" + jobid_);
+
+			String delResBody = "";
+			try {
+				System.out.println("Is Workflow completed?::" + ap.getWorkflowStatus(jobid_, token));
+				delResBody = ap.getTaskDetail(jobid_, "7858", "$..outgoing..return_data", token);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+
+			System.out.println(delResBody);
+			if (delResBody != null && delResBody.contains("successfully")) {
+				serviceCleanedInAsri = true;
+				exVar_AsriStatus = "CLEANED";
+				exData.put("colAsri_Status", exVar_AsriStatus);
+				if (exVar_Environment.equalsIgnoreCase("NULL")) {
+					exVar_Environment = "TEST1";
+					exData.put("colEnvironment", exVar_Environment);
+				}
+				// updation for endpoint
+				if (serviceID.contains("_")) {
+					exData.put("colService", serviceID);
+					exData.put("colRequestId", "NULL");
+					exData.put("colActStatus", "NULL");
+					exData.put("colActId", "NULL");
+					exData.put("colDeactivateJobId", "NULL");
+					exData.put("colError", "NULL");
+				}
+
+			} else {
+
+				exVar_AsriStatus = "NOT CLEANED";
+				exData.put("colAsri_Status", exVar_AsriStatus);
+				if (serviceID.contains("_")) {
+					exData.put("colService", serviceID);
+					exData.put("colRequestId", "NULL");
+					exData.put("colActStatus", "NULL");
+					exData.put("colActId", "NULL");
+					exData.put("colDeactivateJobId", "NULL");
+					exData.put("colError", "NULL");
+				}
+			}
+		} else {
+			System.out.println("Service not found in Test1..checking in Test4");
+			resolvedUrl = Test4_SASI.replaceAll("service_type", serviceType);
+			resolvedUrl = resolvedUrl + serviceID;
+//		System.out.println(resolvedUrl);
+			serviceBody = given().relaxedHTTPSValidation().get(resolvedUrl).body().asString();
+			resourceId = JsonPath.read(serviceBody, "$..resources[*].id");
+			resourceType = JsonPath.read(serviceBody, "$..resources[0].type");
+			if (resourceId.size() > 0) {
+				// setting environment
+				AUTOPILOT.environment = "4";
+				System.out.println("Service found in TEST4\nresourceId::" + resourceId.get(0));
+
+				String resTypeFormatted = resourceType.get(0).replaceAll("\\s+", "").toLowerCase();
+
+				if (resTypeFormatted.equalsIgnoreCase("uni")) {
+					resName = "unis";
+					resType = "Uni";
+				} else if (resTypeFormatted.equalsIgnoreCase("oline")) {
+					resName = "olines";
+					resType = "OLine";
+				} else if (resTypeFormatted.equalsIgnoreCase("internetaccess")) {
+					resName = "internetaccesses";
+					resType = "InternetAccess";
+				} else if (resTypeFormatted.equalsIgnoreCase("ovc")) {
+					resName = "ovcs";
+					resType = "Ovc";
+				} else if (resTypeFormatted.equalsIgnoreCase("evc")) {
+					resName = "evcs";
+					resType = "Evc";
+				} else if (resTypeFormatted.equalsIgnoreCase("mp-evc")) {
+					resName = "mpevcs";
+					resType = "MpEvc";
+				} else if (resTypeFormatted.equalsIgnoreCase("ovcendPoint")) {
+					resName = "ovcendpoints";
+					resType = "OvcEndpoint";
+				} else if (resTypeFormatted.equalsIgnoreCase("evcendPoint")) {
+					resName = "evcendpoints";
+					resType = "EvcEndpoint";
+				} else if (resTypeFormatted.equalsIgnoreCase("mp-evcendpoint")) {
+					resName = "mpevcendpoints";
+					resType = "MpEvcEndpoint";
+				} else if (resTypeFormatted.equalsIgnoreCase("ipvpnendpoint")) {
+					resName = "ipvpnendpoints";
+					resType = "IpVpnEndpoint";
+				}
+
+				String resName_resType = resName + "_" + resType;
+
+				String token = ap.getToken(username, password);
+//			System.out.println("Logging into Autopilot\nToken generated::"+token+"\nLogged in Successfully");
+//			System.out.println("Logging into Autopilot\nLogged in Successfully");
+				String jobid_ = ap.triggerWorkflow(resName_resType, serviceID, "Delete_ResourceByFilter_ASRI_AL",
+						token);
+
+				System.out.println("Triggering workflow::\"Delete_ResourceByFilter_ASRI_AL\"\nJob id::" + jobid_);
+
+				String delResBody = "";
+				try {
+					System.out.println("Is Workflow completed?::" + ap.getWorkflowStatus(jobid_, token));
+					delResBody = ap.getTaskDetail(jobid_, "7858", "$..outgoing..return_data", token);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+
+				System.out.println(delResBody);
+				if (delResBody != null && delResBody.contains("successfully")) {
+					serviceCleanedInAsri = true;
+					exVar_AsriStatus = "CLEANED";
+					exData.put("colAsri_Status", exVar_AsriStatus);
+					if (exVar_Environment.equalsIgnoreCase("NULL")) {
+						exVar_Environment = "TEST4";
+						exData.put("colEnvironment", exVar_Environment);
+					}
+					// updation for endpoint
+					if (serviceID.contains("_")) {
+						exData.put("colService", serviceID);
+						exData.put("colRequestId", "NULL");
+						exData.put("colActStatus", "NULL");
+						exData.put("colActId", "NULL");
+						exData.put("colDeactivateJobId", "NULL");
+						exData.put("colError", "NULL");
+					}
+
+				} else {
+
+					exVar_AsriStatus = "NOT CLEANED";
+					exData.put("colAsri_Status", exVar_AsriStatus);
+					if (serviceID.contains("_")) {
+						exData.put("colService", serviceID);
+						exData.put("colRequestId", "NULL");
+						exData.put("colActStatus", "NULL");
+						exData.put("colActId", "NULL");
+						exData.put("colDeactivateJobId", "NULL");
+						exData.put("colError", "NULL");
+					}
+				}
+			} else {
+				System.out.println("Service not found in Test4 also");
+				exVar_AsriStatus = "NOT FOUND/CLEANED";
+				exData.put("colAsri_Status", exVar_AsriStatus);
+				if (serviceID.contains("_")) {
+					exData.put("colService", serviceID);
+					exData.put("colRequestId", "NULL");
+					exData.put("colActStatus", "NULL");
+					exData.put("colActId", "NULL");
+					exData.put("colDeactivateJobId", "NULL");
+					exData.put("colError", "NULL");
+					exData.put("colIP_Status", "NULL");
+				}
+
+			}
+		}
+		System.out.println(
+				"==============================================ASRI CLEANUP END===================================================\n\n");
+		return isInternetService;
+	}
 
 	public static void printMap() throws IOException {
 		Iterator it = exData.entrySet().iterator();
-		System.out.println("+-------------+-------------+-------------+-------------+-------------+-------------+-------------+-------------+");
+		System.out.println(
+				"+-------------+-------------+-------------+-------------+-------------+-------------+-------------+-------------+");
 		while (it.hasNext()) {
 			Map.Entry pair = (Map.Entry) it.next();
 			System.out.println(pair.getKey() + " = " + pair.getValue());
 		}
-		System.out.println("+-------------+-------------+-------------+-------------+-------------+--------------------------+-------------+\n\n");
+		System.out.println(
+				"+-------------+-------------+-------------+-------------+-------------+--------------------------+-------------+\n\n");
 //		    eu.writeExcel(exData,"C:\\STAF_Files\\CleanedIpSheet_"+dateTime+".xlsx");
 		eu.writeExcel(exData, fileDir + "\\IP_DATA\\CLEANED_IP_FILES\\CleanedIpSheet_" + dateTime + ".xlsx");
 
@@ -1022,5 +2510,241 @@ public static ArrayList<String> getParentServices(String serviceID) {
 		exVar_AsriStatus = "CLEANED";
 		exData.put("colIP_Status", "NULL");
 	}
+	
+	public static boolean networkCleanup1(String service, String environment) {
+		
+		// Logic to clean up the network
+		// If network is cleaned up successfully, return true
+		// Else return false
+		boolean actCleanupStatus = false;
+		AUTOPILOT autopilot = new AUTOPILOT();
+		//set the environment
+		autopilot.environment = environment;
+		
+		
+		//get the request ids
+		ArrayList<String> ReqID_ServiceType_ReqType = new ArrayList<String>();
+		ReqID_ServiceType_ReqType = getRequestIDs(service, environment);
+		if (ReqID_ServiceType_ReqType.size() == 0) {
+			System.out.println("No request found for the given service::" + service +" in the "+environment+" environment");
+			actCleanupStatus = true;
+			return actCleanupStatus;
+		}else if (ReqID_ServiceType_ReqType.size() > 0) {
+			if(ReqID_ServiceType_ReqType.get(0).contains("delete")) {
+				ArrayList<String> actInfo = new ArrayList<String>();
+				actInfo = getActDetailsUsingRequestID(ReqID_ServiceType_ReqType.get(0).split("&&")[0], environment);
+				if (actInfo.size() > 0) {
+					String identifier_id = actInfo.get(0);
+					String header_identifier = actInfo.get(1);
+					// cleanup the network
+					System.out.println("+-----------------ACT CLEANUP START---------------------------------------------------------------+");
+					System.out.println("Act request found for ServiceID::"+service+ "in the environment::"+ environment);
+					System.out.println("Network cleanup already done for ServiceID::"+service+ "\nidentifier_id::" + identifier_id + "\nheader_identifier::" + header_identifier);
+					actCleanupStatus = true;
+					System.out.println("+-----------------ACT CLEANUP END-----------------------------------------------------------------+");
+				}
+			} else {
+				// get the act details using request id
+				ArrayList<String> actInfo = new ArrayList<String>();
+				actInfo = getActDetailsUsingRequestID(ReqID_ServiceType_ReqType.get(0).split("&&")[0], environment);
+				if (actInfo.size() > 0) {
+					String identifier_id = actInfo.get(0);
+					String header_identifier = actInfo.get(1);
+					// cleanup the network
+					System.out.println("+-----------------ACT CLEANUP START---------------------------------------------------------------+");
+					System.out.println("Act request found for ServiceID::"+service+ "in the environment::"+ environment);
+					System.out.println("Network cleanup is in progress for ServiceID::"+service+ "\nidentifier_id::" + identifier_id + "\nheader_identifier::" + header_identifier);
+					
+					//perform network cleanup
+					
+					String token = autopilot.getToken(username, password);
+//					System.out.println("Logging into Autopilot\nToken generated::"+token+"\nLogged in Successfully");
+//					System.out.println("Logging into Autopilot\nLogged in Successfully");
+					String jobid_ = autopilot.triggerWorkflow(identifier_id, header_identifier, "LNAAS_DELETE_TRANSACTION_ACT_TL_V1",
+							token);
+					System.out.println("Triggering workflow::\"LNAAS_DELETE_TRANSACTION_ACT_TL_V1\"\nJob id::" + jobid_);
+					try {
+						System.out.println("Is Workflow completed?::" + autopilot.getWorkflowStatus(jobid_, token));
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+					
+					try {
+						String errorString = autopilot.getTaskDetail(jobid_, "e5b9", "$..outgoing.return_value", token);
+						if (errorString != null) {
+							System.out.println("Delete Transaction from ACT completed Successfully");
+							String successDelActId = autopilot.getTaskDetail(jobid_, "14bc", "$..actIdentifierId", token);
+							actCleanupStatus = true;
+							System.out.println("Delete Transaction from ACT completed Successfully::" + successDelActId);
+							System.out.println("+-----------------ACT CLEANUP END-----------------------------------------------------------------+");
+						} else {
+							errorString = autopilot.getTaskDetail(jobid_, "51ed", "$..outgoing..message", token);
+							String delActId = autopilot.getTaskDetail(jobid_, "51ed", "$..outgoing..actID", token);
+							System.out.println("DELETE Transaction failed with error::");
+							System.out.println("PORT_MONITOR_BUILD_LOG_EXCERPT_ERROR_START");
+//							System.out.println("+------------------------------------------------------------------------------------------------------------------------------------------------+");
+							System.out.println("<h4 style=\"background-color: #bebebe;color: #000000;margin-top: 7px;padding: 10px 1px;text-align: left;\">"+
+									service+ "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ENV::"+environment+"\n</h4>\n<b>ACT_ID</b><br>\n" + delActId + "\n\n<br><br><b>ERROR</b><br>\n" + errorString+"<hr>");
+							System.out.println("<br>===============================================================================================================");
+							System.out.println("ERROR_END");
+							System.out.println(
+									"+-----------+---------+-----------+---------+-----------+---------+-----------+---------+-----------+---------+");
+							System.out.println(errorString);
+							System.out.println(
+									"+-----------+---------+-----------+---------+-----------+---------+-----------+---------+-----------+---------+");
+							System.out.println("Failed to delete Transaction from ACT::" + delActId);
+							System.out.println("+-----------------ACT CLEANUP END-----------------------------------------------------------------+");
+						}
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+					
+					
+					
+				}
+			}
+		}
+		
+
+		return actCleanupStatus;
+
+	}
+	
+	
+	
+	//if explicit environment is provided
+	
+	
+	
+	public static ArrayList<String> cleanPortsViaPortMonitorData(String service, String env , String workflow) {
+		Asri asri = new Asri();
+		ArrayList<String> services = new ArrayList<String>();
+		LinkedHashMap<String, String> servicesMap = asri.consolidateServices(service, env);
+		ArrayList<String> storeCleanedUni = new ArrayList<String>();
+		exVar_IpStatus = "NULL";		
+		exVar_AsriStatus = "NULL";
+		
+
+		if (servicesMap.size() > 0) {
+
+			services = asri.getRearragedServices(servicesMap, env);
+//			for (Iterator iterator = services.iterator(); iterator.hasNext();) {
+			while (services.size() > 0) {
+
+//				String s = (String) iterator.next();
+				String s = (String) services.get(0);
+				System.out.println("Cleanup started for::" + s);
+
+				boolean actCleanUpStatus = IPcleanup.networkCleanup(s, env, workflow);
+				if (actCleanUpStatus) {
+					System.out.println("Act Cleanup is successful");
+
+					// cleaning Ips
+					if (s.contains("IRXX")||s.contains("MVXX")) {
+						IPcleanup.cleanIp(s);
+					}
+					boolean asriCleanUpStatus = IPcleanup.inventoryCleanUp(s, env);
+					if (asriCleanUpStatus) {
+						System.out.println("ASRI Cleanup is successful");
+						
+
+					} else {
+						System.out.println("ASRI Cleanup is not successful");
+						break;
+					}
+				} else {
+					System.out.println("Act Cleanup is not successful");
+					break;
+				}
+				servicesMap = asri.consolidateServices(service, env);
+				services = asri.getRearragedServices(servicesMap, env);
+
+			}
+		} else {
+			System.out.println("Service Not found in Inventory");
+
+			boolean actCleanUpStatus = IPcleanup.networkCleanup(service, env, workflow);
+			if (actCleanUpStatus) {
+				System.out.println("Act Cleanup is successful");
+				boolean asriCleanUpStatus = IPcleanup.inventoryCleanUp(service, env);
+				if (service.contains("IRXX")||service.contains("MVXX")) {
+					IPcleanup.cleanIp(service);
+				}
+				if (asriCleanUpStatus) {
+					System.out.println("ASRI Cleanup is successful");
+				} else {
+					System.out.println("ASRI Cleanup is not successful");
+				}
+			} else {
+				System.out.println("Act Cleanup is not successful");
+			}
+		}
+		exData.put("colAsri_Status", exVar_AsriStatus);
+		exData.put("colIP_Status", exVar_IpStatus);
+//		
+		return storeCleanedUni;
+
+	}
+	
+	
+	public static boolean inventoryCleanUp(String service, String environment) {
+		System.out.println("+------------Inventory Cleanup Start---------------+");
+		System.out.println("Cleanup Started for Service::" + service + " in Environment::" + environment);
+		boolean inventoryCleanUpStatus = false;	
+		AUTOPILOT autopilot = new AUTOPILOT();
+		Asri asri = new Asri();
+		
+		ArrayList<String> serviceTypeList = asri.getServiceType(service, environment);
+		if (!serviceTypeList.isEmpty()) {
+			String serviceType = asri.getServiceType(service, environment).get(0);
+			String resName_resType = asri.getReqNameAndReqType(serviceType, environment);
+			
+			System.out.println("Cleanup Started for Service::" + service);
+			System.out.println("Service type::" + serviceType);
+			System.out.println("Resource Name and Resource Type::" + resName_resType);
+			System.out.println("Environment::" + environment);
+
+			String token = autopilot.getToken(username, password);
+			String jobid_ = autopilot.triggerWorkflow(resName_resType, service, "Delete_ResourceByFilter_ASRI_AL", token);
+			System.out.println("Triggering workflow::\"Delete_ResourceByFilter_ASRI_AL\"\nJob id::" + jobid_);
+
+			String delResBody = "";
+			try {
+				System.out.println("Is Workflow completed?::" + autopilot.getWorkflowStatus(jobid_, token));
+				delResBody = autopilot.getTaskDetail(jobid_, "7858", "$..outgoing..return_data", token);
+				if (delResBody != null && delResBody.contains("successfully")) {
+					inventoryCleanUpStatus = true;
+					exVar_AsriStatus = "CLEANED";
+					exData.put("colAsri_Status", exVar_AsriStatus);
+				} else {
+					inventoryCleanUpStatus = false;
+					exVar_AsriStatus = "NOT CLEANED";
+					exData.put("colAsri_Status", exVar_AsriStatus);
+					delResBody = autopilot.getTaskDetail(jobid_, "69f8", "$..error.response", token);
+					System.out.println("Error::" + delResBody);
+					
+				}
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+			System.out.println("+------------Inventory Cleanup End-----------------+");
+		} else {
+			System.out.println("Service type not found for " + service);
+			inventoryCleanUpStatus = true;
+			exVar_AsriStatus = "NOT FOUND/CLEANED";
+			exData.put("colAsri_Status", exVar_AsriStatus);
+		}		
+		return inventoryCleanUpStatus;
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 
 }

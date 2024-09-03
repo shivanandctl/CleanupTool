@@ -71,36 +71,36 @@ public class ServiceCleanupUtility {
 			IPcleanup.deleteServicefromAsri(endpoint_, "services");
 		}
 		
-		if(oline.size()>0) {
-			String oline_ = (String) oline.get(0);
-			System.out.println("oline::"+oline_);
-			clean_build_ethernet_path_usingServiceAlias(oline_);
-
-			
-			
-		}
+//		if(oline.size()>0) {
+//			String oline_ = (String) oline.get(0);
+//			System.out.println("oline::"+oline_);
+//			clean_build_ethernet_path_usingServiceAlias(oline_);
+//
+//			
+//			
+//		}
 		
 		return result;
 	}
 	
 	
-	public static boolean clean_build_ethernet_path_usingServiceAlias(String olineService) {
-		boolean result = false;
-		Integer olineRequestId = null;
-		LinkedHashMap<Integer, String> newRequestIdMap = IPcleanup.getNewRequestIDs(olineService,"new");
-		Iterator it = newRequestIdMap.entrySet().iterator();
-		while (it.hasNext()) {
-			Map.Entry pair = (Map.Entry) it.next();				
-			String producType = (String) pair.getValue();
-			if(producType.equalsIgnoreCase("build_ethernet_path")) {
-				olineRequestId =  (Integer) pair.getKey();
-			}
-		}
-		IPcleanup.environment = "TEST1";
-		IPcleanup.cleanFromACT(olineRequestId);
-		IPcleanup.deleteServicefromAsri(olineService, "services");		
-		return result;
-	}
+//	public static boolean clean_build_ethernet_path_usingServiceAlias(String olineService) {
+//		boolean result = false;
+//		Integer olineRequestId = null;
+//		LinkedHashMap<Integer, String> newRequestIdMap = IPcleanup.getNewRequestIDs(olineService,"new");
+//		Iterator it = newRequestIdMap.entrySet().iterator();
+//		while (it.hasNext()) {
+//			Map.Entry pair = (Map.Entry) it.next();				
+//			String producType = (String) pair.getValue();
+//			if(producType.equalsIgnoreCase("build_ethernet_path")) {
+//				olineRequestId =  (Integer) pair.getKey();
+//			}
+//		}
+//		IPcleanup.environment = "TEST1";
+//		IPcleanup.cleanFromACT(olineRequestId);
+//		IPcleanup.deleteServicefromAsri(olineService, "services");		
+//		return result;
+//	}
 	
 	public static boolean clean_build_ethernet_path_usingRequestId(Integer requestID, String olineAlias) {
 		boolean result = false;
