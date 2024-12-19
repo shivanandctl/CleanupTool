@@ -37,24 +37,37 @@ public class IPcleanup {
 
 	}
 
-	public static String Test1_authUrl = "http://act-env1.idc1.level3.com:8081/ac-ip-rs-web/rs/auth";
-	public static String Test1_fetch = "http://act-env1.idc1.level3.com:8081/ac-ip-rs-web/rs/view/default/data?q0=";
-	public static String Test1_fetchDetailsFromReqId = "http://act-env1.idc1.level3.com:8081/ac-ip-rs-web/rs/requestPayload?requestID=";
+	public static String Test1_authUrl = "https://act-env1.corp.intranet/ac-ip-rs-web/rs/auth";
+	public static String Test1_fetch = "https://act-env1.corp.intranet/ac-ip-rs-web/rs/view/default/data?q0=";
+	public static String Test1_fetchDetailsFromReqId = "http://act-env1.corp.intranet/ac-ip-rs-web/rs/requestPayload?requestID=";
 
-	public static String Test2_authUrl = "http://act-env2.idc1.level3.com:8081/ac-ip-rs-web/rs/auth";
-	public static String Test2_fetch = "http://act-env2.idc1.level3.com:8081/ac-ip-rs-web/rs/view/default/data?q0=";
-	public static String Test2_fetchDetailsFromReqId = "http://act-env2.idc1.level3.com:8081/ac-ip-rs-web/rs/requestPayload?requestID=";
+	public static String Test2_authUrl = "https://act-env2.corp.intranet/ac-ip-rs-web/rs/auth";
+	public static String Test2_fetch = "https://act-env2.corp.intranet/ac-ip-rs-web/rs/view/default/data?q0=";
+	public static String Test2_fetchDetailsFromReqId = "http://act-env2.corp.intranet/ac-ip-rs-web/rs/requestPayload?requestID=";
 
-	public static String Test4_authUrl = "http://act-env4.idc1.level3.com:8081/ac-ip-rs-web/rs/auth";
-	public static String Test4_fetch = "http://act-env4.idc1.level3.com:8081/ac-ip-rs-web/rs/view/default/data?q0=";
-	public static String Test4_fetchDetailsFromReqId = "http://act-env4.idc1.level3.com:8081/ac-ip-rs-web/rs/requestPayload?requestID=";
+	public static String Test4_authUrl = "https://act-env4.corp.intranet/ac-ip-rs-web/rs/auth";
+	public static String Test4_fetch = "https://act-env4.corp.intranet/ac-ip-rs-web/rs/view/default/data?q0=";
+	public static String Test4_fetchDetailsFromReqId = "http://act-env4.corp.intranet/ac-ip-rs-web/rs/requestPayload?requestID=";
 
-	public static String Test1_SASI = "https://sasi-test1.kubeodc-test.corp.intranet/inventory/v1/asri/service_type?name=";
-	public static String Test2_SASI = "https://sasi-test2.kubeodc-test.corp.intranet/inventory/v1/asri/service_type?name=";
-	public static String Test4_SASI = "https://sasi-test4.kubeodc-test.corp.intranet/inventory/v1/asri/service_type?name=";
+//	public static String Test1_SASI = "https://sasi-test1.kubeodc-test.corp.intranet/inventory/v1/asri/service_type?name=";
+//	public static String Test2_SASI = "https://sasi-test2.kubeodc-test.corp.intranet/inventory/v1/asri/service_type?name=";
+//	public static String Test4_SASI = "https://sasi-test4.kubeodc-test.corp.intranet/inventory/v1/asri/service_type?name=";
+	
+	//new SASI URLs
+	public static String Test1_SASI = "https://api-test1.test.intranet/Inventory/v1/Resource/sasi/asri/service_type?name=";
+	public static String Test2_SASI = "https://api-test2.test.intranet/Inventory/v1/Resource/sasi/asri/service_type?name=";
+	public static String Test4_SASI = "https://api-test4.test.intranet/Inventory/v1/Resource/sasi/asri/service_type?name=";
+	
+	public static String SASI_HEADER_APP_KEY_NAME = "X-Level3-Application-key";
+	public static String SASI_HEADER_APP_KEY_VALUE = "APPKEY764872024091808122324561435";
+	
 
-	public static String Test_GET_IP = "https://sasi-sasiwrap-test1.kubeodc.corp.intranet/wrappers/nisws/ipBlocks?circuitId=";
-	public static String Test_IP_Release = "https://sasi-sasiwrap-test1.kubeodc.corp.intranet/wrappers/nisws/ipRelease";
+//	public static String Test_GET_IP = "https://sasi-sasiwrap-test1.kubeodc.corp.intranet/wrappers/nisws/ipBlocks?circuitId=";
+//	public static String Test_IP_Release = "https://sasi-sasiwrap-test1.kubeodc.corp.intranet/wrappers/nisws/ipRelease";
+	
+	//new SASI URLs for IP cleanup
+	public static String Test_GET_IP = "https://api-test1.test.intranet/Inventory/v1/Resource/sasiwrap/nisws/ipBlocks?circuitId=";
+	public static String Test_IP_Release = "https://api-test1.test.intranet/Inventory/v1/Resource/sasiwrap/nisws/ipRelease";
 
 	public static String username;
 	public static String password;
@@ -344,7 +357,7 @@ public class IPcleanup {
 		String resolvedUrl = Test1_SASI.replaceAll("service_type", serviceType);
 		resolvedUrl = resolvedUrl + serviceID;
 //		System.out.println(resolvedUrl);
-		String serviceBody = given().relaxedHTTPSValidation().get(resolvedUrl).body().asString();
+		String serviceBody = given().relaxedHTTPSValidation().header(SASI_HEADER_APP_KEY_NAME, SASI_HEADER_APP_KEY_VALUE).get(resolvedUrl).body().asString();
 		ArrayList<String> resourceId = JsonPath.read(serviceBody, "$..resources[*].id");
 		ArrayList<String> resourceType = JsonPath.read(serviceBody, "$..resources[0].type");
 		if (resourceId.size() > 0) {
@@ -352,7 +365,7 @@ public class IPcleanup {
 			String[] deleteUrl = Test1_SASI.split("service_type");
 			String resolvedDeleteUrl = deleteUrl[0] + serviceType + "/".concat(resourceId.get(0));
 			System.out.println(resolvedDeleteUrl);
-			String delResBody = given().relaxedHTTPSValidation().delete(resolvedDeleteUrl).body().asString();
+			String delResBody = given().relaxedHTTPSValidation().header(SASI_HEADER_APP_KEY_NAME, SASI_HEADER_APP_KEY_VALUE).delete(resolvedDeleteUrl).body().asString();
 			System.out.println(delResBody);
 			if (delResBody.contains("successfully")) {
 				serviceCleanedInAsri = true;
@@ -390,7 +403,7 @@ public class IPcleanup {
 			resolvedUrl = Test4_SASI.replaceAll("service_type", serviceType);
 			resolvedUrl = resolvedUrl + serviceID;
 //			System.out.println(resolvedUrl);
-			serviceBody = given().relaxedHTTPSValidation().get(resolvedUrl).body().asString();
+			serviceBody = given().relaxedHTTPSValidation().header(SASI_HEADER_APP_KEY_NAME, SASI_HEADER_APP_KEY_VALUE).get(resolvedUrl).body().asString();
 			resourceId = JsonPath.read(serviceBody, "$..resources[*].id");
 			resourceType = JsonPath.read(serviceBody, "$..resources[0].type");
 			if (resourceId.size() > 0) {
@@ -398,7 +411,7 @@ public class IPcleanup {
 				String[] deleteUrl = Test4_SASI.split("service_type");
 				String resolvedDeleteUrl = deleteUrl[0] + serviceType + "/".concat(resourceId.get(0));
 //				System.out.println(resolvedDeleteUrl);
-				String delResBody = given().relaxedHTTPSValidation().delete(resolvedDeleteUrl).body().asString();
+				String delResBody = given().relaxedHTTPSValidation().header(SASI_HEADER_APP_KEY_NAME, SASI_HEADER_APP_KEY_VALUE).delete(resolvedDeleteUrl).body().asString();
 				System.out.println(delResBody);
 				if (delResBody.contains("successfully")) {
 					serviceCleanedInAsri = true;
@@ -453,7 +466,7 @@ public class IPcleanup {
 		String resolvedUrl = Test1_SASI.replaceAll("service_type", serviceType);
 		resolvedUrl = resolvedUrl + serviceID;
 //		System.out.println(resolvedUrl);
-		String serviceBody = given().relaxedHTTPSValidation().get(resolvedUrl).body().asString();
+		String serviceBody = given().relaxedHTTPSValidation().header(SASI_HEADER_APP_KEY_NAME, SASI_HEADER_APP_KEY_VALUE).get(resolvedUrl).body().asString();
 		ArrayList<String> resourceId = JsonPath.read(serviceBody, "$..resources[*].id");
 		ArrayList<String> resourceType = JsonPath.read(serviceBody, "$..resources[0].type");
 		if (resourceId.size() > 0) {
@@ -461,7 +474,7 @@ public class IPcleanup {
 			String[] deleteUrl = Test1_SASI.split("service_type");
 			String resolvedDeleteUrl = deleteUrl[0] + serviceType + "/".concat(resourceId.get(0));
 			System.out.println(resolvedDeleteUrl);
-			String delResBody = given().relaxedHTTPSValidation().delete(resolvedDeleteUrl).body().asString();
+			String delResBody = given().relaxedHTTPSValidation().header(SASI_HEADER_APP_KEY_NAME, SASI_HEADER_APP_KEY_VALUE).delete(resolvedDeleteUrl).body().asString();
 			System.out.println(delResBody);
 			if (delResBody.contains("successfully")) {
 				serviceCleanedInAsri = true;
@@ -499,7 +512,7 @@ public class IPcleanup {
 			resolvedUrl = Test4_SASI.replaceAll("service_type", serviceType);
 			resolvedUrl = resolvedUrl + serviceID;
 //			System.out.println(resolvedUrl);
-			serviceBody = given().relaxedHTTPSValidation().get(resolvedUrl).body().asString();
+			serviceBody = given().relaxedHTTPSValidation().header(SASI_HEADER_APP_KEY_NAME, SASI_HEADER_APP_KEY_VALUE).get(resolvedUrl).body().asString();
 			resourceId = JsonPath.read(serviceBody, "$..resources[*].id");
 			resourceType = JsonPath.read(serviceBody, "$..resources[0].type");
 			if (resourceId.size() > 0) {
@@ -507,7 +520,7 @@ public class IPcleanup {
 				String[] deleteUrl = Test4_SASI.split("service_type");
 				String resolvedDeleteUrl = deleteUrl[0] + serviceType + "/".concat(resourceId.get(0));
 //				System.out.println(resolvedDeleteUrl);
-				String delResBody = given().relaxedHTTPSValidation().delete(resolvedDeleteUrl).body().asString();
+				String delResBody = given().relaxedHTTPSValidation().header(SASI_HEADER_APP_KEY_NAME, SASI_HEADER_APP_KEY_VALUE).delete(resolvedDeleteUrl).body().asString();
 				System.out.println(delResBody);
 				if (delResBody.contains("successfully")) {
 					serviceCleanedInAsri = true;
@@ -559,7 +572,7 @@ public class IPcleanup {
 				"==============================================IP CLEANUP START=================================================");
 		boolean isIpCleaned = false;
 		String resolvedIpUrl = Test_GET_IP + serviceID;
-		String iPResBody = given().relaxedHTTPSValidation().get(resolvedIpUrl).body().asString();
+		String iPResBody = given().relaxedHTTPSValidation().header(SASI_HEADER_APP_KEY_NAME, SASI_HEADER_APP_KEY_VALUE).get(resolvedIpUrl).body().asString();
 		ArrayList<String> ipList = JsonPath.read(iPResBody, "$..ipBlock..cidrRange");
 		if (ipList.size() > 0) {
 			System.out.println("IPs Found!!\nNumber of IPs occupied by " + serviceID + " is::" + ipList.size());
@@ -569,6 +582,7 @@ public class IPcleanup {
 						+ "    \"cidrRange\" : \"" + ip + "\"\r\n" + "}";
 				System.out.println(ipReleasePayload);
 				String ipReleaseResponse = given().relaxedHTTPSValidation().header("Content-type", "application/json")
+						.header(SASI_HEADER_APP_KEY_NAME, SASI_HEADER_APP_KEY_VALUE)
 						.and().body(ipReleasePayload).when().post(Test_IP_Release).then().extract().response()
 						.asString();
 				System.out.println(ipReleaseResponse);
@@ -601,15 +615,15 @@ public class IPcleanup {
 		try {
 			encodedAuth = Base64.encodeBase64(auth.getBytes("UTF-8"));
 			authHeader = new String(encodedAuth);
-			Response Test1_response = given().relaxedHTTPSValidation().auth().preemptive().basic(username, password)
+			Response Test1_response = given().relaxedHTTPSValidation()
 					.header("authorization", authHeader).get(Test1_authUrl);
 			Map<String, String> Test1_cook = Test1_response.cookies();
 
-			Response Test4_response = given().relaxedHTTPSValidation().auth().preemptive().basic(username, password)
+			Response Test4_response = given().relaxedHTTPSValidation()
 					.header("authorization", authHeader).get(Test4_authUrl);
 			Map<String, String> Test4_cook = Test4_response.cookies();
 
-			Response Test2_response = given().relaxedHTTPSValidation().auth().preemptive().basic(username, password)
+			Response Test2_response = given().relaxedHTTPSValidation()
 					.header("authorization", authHeader).get(Test2_authUrl);
 			Map<String, String> Test2_cook = Test2_response.cookies();
 
@@ -888,20 +902,39 @@ public class IPcleanup {
 		ArrayList<Map<String, String>> cookiesMap = actAuthentication();
 		ArrayList<String> ReqID_ServiceType_ReqType = new ArrayList<String>();
 		String actJsonResponse = null;
+		String finalUrl = null;
+		
+		// prepare complete URL
+				if (environment.contains("1")) {
+					finalUrl = "https://act-env1.corp.intranet/ac-ip-rs-web/rs/view/default/data?q0=" + serviceAlias;
+//					System.out.println("URL for ACT in the environment::"+environment+"::\n"+finalUrl);
+					actJsonResponse = RestAssured.given().relaxedHTTPSValidation().cookies(cookiesMap.get(0)).when()
+							.get(finalUrl).body().asString();
+				} else if (environment.contains("2")) {
+					finalUrl = "https://act-env2.corp.intranet/ac-ip-rs-web/rs/view/default/data?q0=" + serviceAlias;
+//					System.out.println("URL for ACT in the environment::"+environment+"::\n"+finalUrl);
+					actJsonResponse = RestAssured.given().relaxedHTTPSValidation().cookies(cookiesMap.get(2)).when()
+							.get(finalUrl).body().asString();
+				} else if (environment.contains("4")) {
+					finalUrl = "https://act-env4.corp.intranet/ac-ip-rs-web/rs/view/default/data?q0=" + serviceAlias;
+//					System.out.println("URL for ACT in the environment::"+environment+"::\n"+finalUrl);
+					actJsonResponse = RestAssured.given().relaxedHTTPSValidation().cookies(cookiesMap.get(1)).when()
+							.get(finalUrl).body().asString();
+				}
 
-		if (environment.contains("1")) {
-			actJsonResponse = RestAssured.given().cookies(cookiesMap.get(0)).when()
-					.get("http://act-env1.idc1.level3.com:8081/ac-ip-rs-web/rs/view/default/data?q0=" + serviceAlias)
-					.body().asString();
-		} else if (environment.contains("2")) {
-			actJsonResponse = RestAssured.given().cookies(cookiesMap.get(2)).when()
-					.get("http://act-env2.idc1.level3.com:8081/ac-ip-rs-web/rs/view/default/data?q0=" + serviceAlias)
-					.body().asString();
-		} else if (environment.contains("4")) {
-			actJsonResponse = RestAssured.given().cookies(cookiesMap.get(1)).when()
-					.get("http://act-env4.idc1.level3.com:8081/ac-ip-rs-web/rs/view/default/data?q0=" + serviceAlias)
-					.body().asString();
-		}
+//		if (environment.contains("1")) {
+//			actJsonResponse = RestAssured.given().cookies(cookiesMap.get(0)).when()
+//					.get("http://act-env1.idc1.level3.com:8081/ac-ip-rs-web/rs/view/default/data?q0=" + serviceAlias)
+//					.body().asString();
+//		} else if (environment.contains("2")) {
+//			actJsonResponse = RestAssured.given().cookies(cookiesMap.get(2)).when()
+//					.get("http://act-env2.idc1.level3.com:8081/ac-ip-rs-web/rs/view/default/data?q0=" + serviceAlias)
+//					.body().asString();
+//		} else if (environment.contains("4")) {
+//			actJsonResponse = RestAssured.given().cookies(cookiesMap.get(1)).when()
+//					.get("http://act-env4.idc1.level3.com:8081/ac-ip-rs-web/rs/view/default/data?q0=" + serviceAlias)
+//					.body().asString();
+//		}
 		
 		if (actJsonResponse.contains("Unauthorized")) {
 			System.out.println("\n\n\n+-------------------------------------------------+");
@@ -989,6 +1022,122 @@ public class IPcleanup {
 
 	}
 
+	public static ArrayList<String> getRequestIDsWithServiceType(String serviceAlias, String environment, String typeOfService, String productType) {
+
+		ArrayList<Map<String, String>> cookiesMap = actAuthentication();
+		ArrayList<String> ReqID_ServiceType_ReqType = new ArrayList<String>();
+		String actJsonResponse = null;
+
+		if (environment.contains("1")) {
+			actJsonResponse = RestAssured.given().cookies(cookiesMap.get(0)).when()
+					.get("http://act-env1.idc1.level3.com:8081/ac-ip-rs-web/rs/view/default/data?q0=" + serviceAlias)
+					.body().asString();
+		} else if (environment.contains("2")) {
+			actJsonResponse = RestAssured.given().cookies(cookiesMap.get(2)).when()
+					.get("http://act-env2.idc1.level3.com:8081/ac-ip-rs-web/rs/view/default/data?q0=" + serviceAlias)
+					.body().asString();
+		} else if (environment.contains("4")) {
+			actJsonResponse = RestAssured.given().cookies(cookiesMap.get(1)).when()
+					.get("http://act-env4.idc1.level3.com:8081/ac-ip-rs-web/rs/view/default/data?q0=" + serviceAlias)
+					.body().asString();
+		}
+		
+		if (actJsonResponse.contains("Unauthorized")) {
+			System.out.println("\n\n\n+-------------------------------------------------+");
+			System.out.println("ACT Login Failed..\nPlease check the credentials and try again..");
+			System.out.println("+-------------------------------------------------+");
+			System.exit(0);
+		}
+
+		JSONObject xmlJSONObj = XML.toJSONObject(actJsonResponse);
+		String jsonPrettyPrintString = xmlJSONObj.toString(4);
+//		System.out.println(jsonPrettyPrintString);
+
+		ArrayList requestIdLength = JsonPath.read(jsonPrettyPrintString, "$..requestID");
+		LinkedHashMap<Integer, String> newRequestIdMap = new LinkedHashMap<Integer, String>();
+		Integer requestId = null;
+		if (requestIdLength.size() == 1) {
+			{
+				ArrayList isRequestComplete = JsonPath.read(jsonPrettyPrintString, "$..data[0].data");
+				ArrayList isRequestType = JsonPath.read(jsonPrettyPrintString, "$..data[3].data");
+				ArrayList isProductType = JsonPath.read(jsonPrettyPrintString, "$..data[4].data");
+				ArrayList<String> serviceType = JsonPath.read(jsonPrettyPrintString, "$..data[5].data");
+				ArrayList idNewRequest = null;
+				String reqType = null;
+				String reqComplete = null;
+				String serviceTypeName = null;
+				String productTypeName = null;
+
+				if (isRequestType.size() > 0) {
+					reqType = (String) isRequestType.get(0);
+					reqComplete = (String) isRequestComplete.get(0);
+					productTypeName = (String) isProductType.get(0);
+					serviceTypeName = (String) serviceType.get(0);
+					
+					if (reqType.equalsIgnoreCase("new") && reqComplete.equalsIgnoreCase("complete") && serviceTypeName.equalsIgnoreCase(typeOfService) && productTypeName.equalsIgnoreCase(productType) ) {
+						idNewRequest = JsonPath.read(jsonPrettyPrintString, "$..requestID");
+						if (idNewRequest.size() > 0) {
+							requestId = (Integer) idNewRequest.get(0);
+							newRequestIdMap.put(requestId, serviceTypeName + "_" + reqType);
+							ReqID_ServiceType_ReqType
+									.add(requestId.toString() + "&&" + serviceTypeName + "&&" + reqType);
+						}
+					}
+				}
+			}
+		} else {
+			ArrayList givenServiceType = JsonPath.read(jsonPrettyPrintString, "$..data[5].data");
+			int serviceTypeSize = givenServiceType.size();
+			if (serviceTypeSize > 0) {
+//				String serviceTypeName = (String) givenServiceType.get(serviceTypeSize - 1);
+				// System.out.println("Given input is of Type::"+serviceTypeName);
+
+				for (int i = 0; i < requestIdLength.size(); i++) {
+					ArrayList isRequestType = JsonPath.read(jsonPrettyPrintString, "$..rows[" + i + "]..data[3].data");
+					ArrayList isRequestComplete = JsonPath.read(jsonPrettyPrintString,
+							"$..rows[" + i + "]..data[0].data");
+					ArrayList<String> serviceType = JsonPath.read(jsonPrettyPrintString,
+							"$..rows[" + i + "]..data[5].data");
+					ArrayList isProductType = JsonPath.read(jsonPrettyPrintString, "$..rows[" + i + "]..data[4].data");
+
+					ArrayList idNewRequest = null;
+					String reqType = null;
+					String reqComplete = null;
+					String innerServiceTypeName = null;
+					String innerProductTypeName = null;
+
+					if (isRequestType.size() > 0) {
+						reqType = (String) isRequestType.get(0);
+						reqComplete = (String) isRequestComplete.get(0);
+						innerServiceTypeName = (String) serviceType.get(0);
+						innerProductTypeName = (String) isProductType.get(0);
+						
+						// if (reqType.equalsIgnoreCase(activity) &&
+						// reqComplete.equalsIgnoreCase("complete")) {
+						if (reqComplete.equalsIgnoreCase("complete")
+								&& innerServiceTypeName.equalsIgnoreCase(typeOfService)
+								&& innerProductTypeName.equalsIgnoreCase(productType)
+								&& (reqType.equalsIgnoreCase("new") || reqType.equalsIgnoreCase("delete") || reqType.equalsIgnoreCase("enableDDoS"))) {
+							idNewRequest = JsonPath.read(jsonPrettyPrintString, "$..rows[" + i + "]..requestID");
+							if (idNewRequest.size() > 0) {
+								// System.out.println("Given input is of Type::"+serviceTypeName);
+								requestId = (Integer) idNewRequest.get(0);
+								newRequestIdMap.put(requestId, innerServiceTypeName + "_" + reqType);
+								ReqID_ServiceType_ReqType
+										.add(requestId.toString() + "&&" + innerServiceTypeName + "&&" + reqType);
+								// System.out.println(serviceTypeName+"::"+requestId+"::"+reqType);
+							}
+						}
+					}
+				}
+			}
+
+		}
+
+		return ReqID_ServiceType_ReqType;
+
+	}
+	
 	public static boolean networkCleanup(String service, String env_, String workflow) {
 
 		// Logic to clean up the network
@@ -1001,6 +1150,7 @@ public class IPcleanup {
 
 		exVar_ServiceAlias = service;
 		exData.put("colService", exVar_ServiceAlias);
+		
 
 		ArrayList<String> envs = new ArrayList<String>();
 		if (env_.equalsIgnoreCase("null") || env_.equalsIgnoreCase("") || env_==null) {
@@ -1018,13 +1168,15 @@ public class IPcleanup {
 		for (String env : envs) {
 			System.out.println("Checking RequestID for the Service::" + service + " in the " + env + " environment");
 			ReqID_ServiceType_ReqType = getRequestIDs(service, env);
+			//getRequestIDsWithServiceType
 			if (ReqID_ServiceType_ReqType.size() > 0) {
 				ap.environment = env;
 				environment = env;
 				System.out.println("RequestID found for the Service::" + service + " in the " + env + " environment");
 				break;
 			} else {
-					System.out.println("RequestID not found  in the " + env + " environment");
+					System.out.println("RequestID not found  in the " + env + " environment..Checking in the next environment");
+					System.out.println(" -------------------------------------------------------------------------");
 			}
 		}
 
@@ -1158,17 +1310,17 @@ public class IPcleanup {
 					
 					
 					
-					// updating the status in excel
-//					exVar_ActStatus = "ALREADY CLEANED";
-//					exVar_Environment = environment.toLowerCase().contains("test") ? environment : "TEST"+environment;
-//					exVar_ActId = identifier_id;
-//					exData.put("colActStatus", exVar_ActStatus);
-//					exData.put("colActId", "Already Delete::" + exVar_ActId);
-//					exData.put("colError", "NULL");
-//					exData.put("colDeactivateJobId", "NULL");
-//					exData.put("colRequestId", "NULL");
-//					exData.put("colEnvironment", exVar_Environment);
-//					System.out.println("\n=======================ACT CLEANUP END============================");
+//					 updating the status in excel
+					exVar_ActStatus = "ALREADY CLEANED";
+					exVar_Environment = environment.toLowerCase().contains("test") ? environment : "TEST"+environment;
+					exVar_ActId = identifier_id;
+					exData.put("colActStatus", exVar_ActStatus);
+					exData.put("colActId", "Already Delete::" + exVar_ActId);
+					exData.put("colError", "NULL");
+					exData.put("colDeactivateJobId", "NULL");
+					exData.put("colRequestId", "NULL");
+					exData.put("colEnvironment", exVar_Environment);
+					System.out.println("\n=======================ACT CLEANUP END============================");
 //					
 					
 				}
@@ -1339,15 +1491,15 @@ public class IPcleanup {
 
 		if (environment.contains("1")) {
 			actJsonResponse = RestAssured.given().when()
-					.get("http://act-env1.idc1.level3.com:8081/ac-ip-rs-web/rs/requestPayload?requestID=" + requestId)
+					.get(Test1_fetchDetailsFromReqId+ requestId)
 					.body().asString();
 		} else if (environment.contains("2")) {
 			actJsonResponse = RestAssured.given().when()
-					.get("http://act-env2.idc1.level3.com:8081/ac-ip-rs-web/rs/requestPayload?requestID=" + requestId)
+					.get(Test2_fetchDetailsFromReqId + requestId)
 					.body().asString();
 		} else if (environment.contains("4")) {
 			actJsonResponse = RestAssured.given().when()
-					.get("http://act-env4.idc1.level3.com:8081/ac-ip-rs-web/rs/requestPayload?requestID=" + requestId)
+					.get(Test4_fetchDetailsFromReqId + requestId)
 					.body().asString();
 		}
 		JSONObject xmlJSONObj = XML.toJSONObject(actJsonResponse);
@@ -1523,13 +1675,13 @@ public class IPcleanup {
 
 		String resolvedUrl = IPcleanup.Test1_SASI.replaceAll("service_type", "services");
 		resolvedUrl = resolvedUrl + serviceID;
-		String serviceBody = given().relaxedHTTPSValidation().get(resolvedUrl).body().asString();
+		String serviceBody = given().relaxedHTTPSValidation().header(SASI_HEADER_APP_KEY_NAME, SASI_HEADER_APP_KEY_VALUE).get(resolvedUrl).body().asString();
 		ArrayList<String> parentServiceName = JsonPath.read(serviceBody, "$..parentServices[*].name");
 		if (parentServiceName.size() == 0) {
 //			System.out.println("No Parent services found in Test1, checking in Test4");
 			resolvedUrl = IPcleanup.Test4_SASI.replaceAll("service_type", "services");
 			resolvedUrl = resolvedUrl + serviceID;
-			serviceBody = given().relaxedHTTPSValidation().get(resolvedUrl).body().asString();
+			serviceBody = given().relaxedHTTPSValidation().header(SASI_HEADER_APP_KEY_NAME, SASI_HEADER_APP_KEY_VALUE).get(resolvedUrl).body().asString();
 			parentServiceName = JsonPath.read(serviceBody, "$..parentServices[*].name");
 			if (parentServiceName.size() < 0) {
 //				System.out.println("No Parent services found in Test4 also");
@@ -1789,7 +1941,7 @@ public class IPcleanup {
 					resolvedUrl = Test2_SASI.replaceAll("service_type", serviceType);
 					resolvedUrl = resolvedUrl + serviceID;
 //				System.out.println(resolvedUrl);
-					serviceBody = given().relaxedHTTPSValidation().get(resolvedUrl).body().asString();
+					serviceBody = given().relaxedHTTPSValidation().header(SASI_HEADER_APP_KEY_NAME, SASI_HEADER_APP_KEY_VALUE).get(resolvedUrl).body().asString();
 					resourceId = JsonPath.read(serviceBody, "$..resources[*].id");
 					resourceType = JsonPath.read(serviceBody, "$..resources[0].type");
 					if (resourceId.size() > 0 && exVar_Environment.contains("2")) { //----------------> Added
@@ -1933,7 +2085,7 @@ public class IPcleanup {
 		String resolvedUrl = Test1_SASI.replaceAll("service_type", serviceType);
 		resolvedUrl = resolvedUrl + serviceID;
 //	System.out.println(resolvedUrl);
-		String serviceBody = given().relaxedHTTPSValidation().get(resolvedUrl).body().asString();
+		String serviceBody = given().relaxedHTTPSValidation().header(SASI_HEADER_APP_KEY_NAME, SASI_HEADER_APP_KEY_VALUE).get(resolvedUrl).body().asString();
 		ArrayList<String> resourceId = JsonPath.read(serviceBody, "$..resources[*].id");
 		ArrayList<String> resourceType = JsonPath.read(serviceBody, "$..resources[0].type");
 		//checking environment also
@@ -2030,7 +2182,7 @@ public class IPcleanup {
 			resolvedUrl = Test4_SASI.replaceAll("service_type", serviceType);
 			resolvedUrl = resolvedUrl + serviceID;
 //		System.out.println(resolvedUrl);
-			serviceBody = given().relaxedHTTPSValidation().get(resolvedUrl).body().asString();
+			serviceBody = given().relaxedHTTPSValidation().header(SASI_HEADER_APP_KEY_NAME, SASI_HEADER_APP_KEY_VALUE).get(resolvedUrl).body().asString();
 			resourceId = JsonPath.read(serviceBody, "$..resources[*].id");
 			resourceType = JsonPath.read(serviceBody, "$..resources[0].type");
 			if (resourceId.size() > 0 ) {  //----------------> Added
@@ -2274,7 +2426,7 @@ public class IPcleanup {
 		String resolvedUrl = Test1_SASI.replaceAll("service_type", serviceType);
 		resolvedUrl = resolvedUrl + serviceID;
 //	System.out.println(resolvedUrl);
-		String serviceBody = given().relaxedHTTPSValidation().get(resolvedUrl).body().asString();
+		String serviceBody = given().relaxedHTTPSValidation().header(SASI_HEADER_APP_KEY_NAME, SASI_HEADER_APP_KEY_VALUE).get(resolvedUrl).body().asString();
 		ArrayList<String> resourceId = JsonPath.read(serviceBody, "$..resources[*].id");
 		ArrayList<String> resourceType = JsonPath.read(serviceBody, "$..resources[0].type");
 		if (resourceId.size() > 0) {
@@ -2370,7 +2522,7 @@ public class IPcleanup {
 			resolvedUrl = Test4_SASI.replaceAll("service_type", serviceType);
 			resolvedUrl = resolvedUrl + serviceID;
 //		System.out.println(resolvedUrl);
-			serviceBody = given().relaxedHTTPSValidation().get(resolvedUrl).body().asString();
+			serviceBody = given().relaxedHTTPSValidation().header(SASI_HEADER_APP_KEY_NAME, SASI_HEADER_APP_KEY_VALUE).get(resolvedUrl).body().asString();
 			resourceId = JsonPath.read(serviceBody, "$..resources[*].id");
 			resourceType = JsonPath.read(serviceBody, "$..resources[0].type");
 			if (resourceId.size() > 0) {
@@ -2716,10 +2868,12 @@ public class IPcleanup {
 					inventoryCleanUpStatus = true;
 					exVar_AsriStatus = "CLEANED";
 					exData.put("colAsri_Status", exVar_AsriStatus);
+					exData.put("colIP_Status", "NULL");
 				} else {
 					inventoryCleanUpStatus = false;
 					exVar_AsriStatus = "NOT CLEANED";
 					exData.put("colAsri_Status", exVar_AsriStatus);
+					exData.put("colIP_Status", "NULL");
 					delResBody = autopilot.getTaskDetail(jobid_, "69f8", "$..error.response", token);
 					System.out.println("Error::" + delResBody);
 					
@@ -2733,12 +2887,38 @@ public class IPcleanup {
 			inventoryCleanUpStatus = true;
 			exVar_AsriStatus = "NOT FOUND/CLEANED";
 			exData.put("colAsri_Status", exVar_AsriStatus);
+			exData.put("colIP_Status", "NULL");
 		}		
 		return inventoryCleanUpStatus;
 	}
 	
 	
-	
+	public void fetchRequestIdFromActId(String actId, String environment) {
+		
+        //fetch request id from act id
+		username = "AC70068";
+		password = "RobVanDam@wwf@1992#";
+		ArrayList<Map<String, String>> cookiesMap = actAuthentication();
+		
+		String actFetchUrl = null;
+		if (environment.equalsIgnoreCase("1")) {
+			actFetchUrl = "http://act-env1.idc1.level3.com:8081/ac-ip-rs-web/rs/view/default/data?q0="+actId;
+		}else if(environment.equalsIgnoreCase("2")) {
+			actFetchUrl = "http://act-env2.idc1.level3.com:8081/ac-ip-rs-web/rs/view/default/data?q0="+actId;
+		}else if(environment.equalsIgnoreCase("4")) {
+			actFetchUrl = "http://act-env4.idc1.level3.com:8081/ac-ip-rs-web/rs/view/default/data?q0="+actId;
+		}
+		
+		String x = given().cookies(cookiesMap.get(0)).when().get(actFetchUrl).body().asString();
+		JSONObject xmlJSONObj = XML.toJSONObject(x);
+		String jsonPrettyPrintString = xmlJSONObj.toString(4);
+		
+		ArrayList requestIdLength = JsonPath.read(jsonPrettyPrintString, "$..requestID");
+		if(requestIdLength.size()>0) {
+			System.out.println("RequestID found in ACT::"+requestIdLength.get(0));
+        }
+		
+    }
 	
 	
 	
