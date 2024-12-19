@@ -15,6 +15,14 @@ import io.restassured.response.Response;
 
 public class Asri {
 	
+	//new SASI URLs
+	public static String Test1_SASI = "https://api-test1.test.intranet/Inventory/v1/Resource/sasi/asri/services?name=";
+	public static String Test2_SASI = "https://api-test2.test.intranet/Inventory/v1/Resource/sasi/asri/services?name=";
+	public static String Test4_SASI = "https://api-test4.test.intranet/Inventory/v1/Resource/sasi/asri/services?name=";
+	
+	public static String SASI_HEADER_APP_KEY_NAME = "X-Level3-Application-key";
+	public static String SASI_HEADER_APP_KEY_VALUE = "APPKEY764872024091808122324561435";
+	
 	AUTOPILOT autopilot = new AUTOPILOT();
 		
 	public static ArrayList<String> getParentServices(String serviceID) {
@@ -22,7 +30,7 @@ public class Asri {
 		String resolvedUrl = IPcleanup.Test1_SASI.replaceAll("service_type", "services");
 		resolvedUrl = resolvedUrl+serviceID;
 //		System.out.println(resolvedUrl);
-		String serviceBody = given().relaxedHTTPSValidation().get(resolvedUrl).body().asString();
+		String serviceBody = given().relaxedHTTPSValidation().header(SASI_HEADER_APP_KEY_NAME, SASI_HEADER_APP_KEY_VALUE).get(resolvedUrl).body().asString();
 		ArrayList<String> parentServiceName = JsonPath.read(serviceBody, "$..parentServices[*].name");
 //		ArrayList<String> parentServiceResourceId = JsonPath.read(serviceBody, "$..parentServices[*].id");
 //		ArrayList<String> parentServiceResourceType = JsonPath.read(serviceBody, "$..parentServices[*].type");
@@ -199,18 +207,24 @@ public ArrayList<String> getServiceType(String service, String environment) {
 
 	if (environment.contains("1")) {
 		autopilot.environment = "1";
-		response = RestAssured.given().relaxedHTTPSValidation().header("Content-type", "application/json").and().when()
-				.get("https://sasi-test1.kubeodc-test.corp.intranet/inventory/v1/asri/services?name=" + service).then().extract().response();
+		response = RestAssured.given().relaxedHTTPSValidation().header("Content-type", "application/json")
+				.header(SASI_HEADER_APP_KEY_NAME, SASI_HEADER_APP_KEY_VALUE)
+				.and().when()
+				.get(Test1_SASI + service).then().extract().response();
 		sasiRes = response.asString();
 	} else if (environment.contains("2")) {
 		autopilot.environment = "2";
-		response = RestAssured.given().relaxedHTTPSValidation().header("Content-type", "application/json").and().when()
-				.get("https://sasi-test2.kubeodc-test.corp.intranet/inventory/v1/asri/services?name=" + service).then().extract().response();
+		response = RestAssured.given().relaxedHTTPSValidation().header("Content-type", "application/json")
+				.header(SASI_HEADER_APP_KEY_NAME, SASI_HEADER_APP_KEY_VALUE)
+				.and().when()
+				.get(Test2_SASI + service).then().extract().response();
 		sasiRes = response.asString();
 	} else if (environment.contains("4")) {
 		autopilot.environment = "4";
-		response = RestAssured.given().relaxedHTTPSValidation().header("Content-type", "application/json").and().when()
-				.get("https://sasi-test4.kubeodc-test.corp.intranet/inventory/v1/asri/services?name=" + service).then().extract().response();
+		response = RestAssured.given().relaxedHTTPSValidation().header("Content-type", "application/json")
+				.header(SASI_HEADER_APP_KEY_NAME, SASI_HEADER_APP_KEY_VALUE)
+				.and().when()
+				.get(Test4_SASI+ service).then().extract().response();
 		sasiRes = response.asString();
 	}
 	serviceType = JsonPath.read(sasiRes, "$..resources[0].type");
@@ -235,18 +249,24 @@ public LinkedHashMap getParentServices(String service, String environment) {
 
 	if (environment.contains("1")) {
 		autopilot.environment = "1";
-		response = RestAssured.given().relaxedHTTPSValidation().header("Content-type", "application/json").and().when()
-				.get("https://sasi-test1.kubeodc-test.corp.intranet/inventory/v1/asri/services?name=" + service).then().extract().response();
+		response = RestAssured.given().relaxedHTTPSValidation().header("Content-type", "application/json")
+				.header(SASI_HEADER_APP_KEY_NAME, SASI_HEADER_APP_KEY_VALUE)
+				.and().when()
+				.get(Test1_SASI + service).then().extract().response();
 		sasiRes = response.asString();
 	} else if (environment.contains("2")) {
 		autopilot.environment = "2";
-		response = RestAssured.given().relaxedHTTPSValidation().header("Content-type", "application/json").and().when()
-				.get("https://sasi-test2.kubeodc-test.corp.intranet/inventory/v1/asri/services?name=" + service).then().extract().response();
+		response = RestAssured.given().relaxedHTTPSValidation().header("Content-type", "application/json")
+				.header(SASI_HEADER_APP_KEY_NAME, SASI_HEADER_APP_KEY_VALUE)
+				.and().when()
+				.get(Test2_SASI + service).then().extract().response();
 		sasiRes = response.asString();
 	} else if (environment.contains("4")) {
 		autopilot.environment = "4";
-		response = RestAssured.given().relaxedHTTPSValidation().header("Content-type", "application/json").and().when()
-				.get("https://sasi-test4.kubeodc-test.corp.intranet/inventory/v1/asri/services?name=" + service).then().extract().response();
+		response = RestAssured.given().relaxedHTTPSValidation().header("Content-type", "application/json")
+				.header(SASI_HEADER_APP_KEY_NAME, SASI_HEADER_APP_KEY_VALUE)
+				.and().when()
+				.get(Test4_SASI + service).then().extract().response();
 		sasiRes = response.asString();
 	}
 	parentServiceName = JsonPath.read(sasiRes, "$..parentServices[*].name");
